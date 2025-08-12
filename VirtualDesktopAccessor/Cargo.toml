@@ -1,0 +1,44 @@
+[package]
+name = "winvd"
+version = "0.0.48"
+authors = ["Jari Otto Oskari Pennanen"]
+license = "MIT"
+edition = "2021"
+description = "Provides functions for accessing Windows 11 virtual desktop API, requires at least 24H2 26100.2605."
+readme = "README-crate.md"
+homepage = "https://github.com/ciantic/VirtualDesktopAccessor/tree/rust/"
+repository = "https://github.com/ciantic/VirtualDesktopAccessor/tree/rust/"
+
+[dependencies]
+windows = { version = "0.58", features = [
+    # Find WinApi features with searching here https://microsoft.github.io/windows-docs-rs/
+    "implement",
+    "Win32_System_Com",
+    "Win32_UI_Shell_Common",        # for IObjectArray
+    "Win32_UI_WindowsAndMessaging", # for TranslateMessage etc.
+    "Win32_Foundation",             # for FindWindowW
+    "Win32_System_Threading",       # For CreateThread
+] }
+windows-core = { version = "0.58" }
+windows-interface = { version = "0.58" }
+windows-implement = { version = "0.58" }
+crossbeam-channel = { version = "0.5.14", optional = true }
+winit = { version = "0.30.5", optional = true }
+macro_rules_attribute = "0.2"
+
+[dev-dependencies]
+once_cell = "1.20.2"
+
+[lib]
+name = "winvd"
+path = "src/lib.rs"
+
+[features]
+integration-tests = []
+
+[package.metadata.docs.rs]
+default-target = "x86_64-pc-windows-msvc"
+all-features = true
+
+[workspace]
+members = ["testbin", "dll"] # , "examples/with-iced"]

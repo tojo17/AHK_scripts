@@ -1,0 +1,11 @@
+# output dirs
+/target/
+
+# rustfmt
+**/*.rs.bk
+
+/expand.rs
+
+/examples
+
+_*

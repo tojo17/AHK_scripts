@@ -1,0 +1,11 @@
+{
+    "editor.formatOnSave": true,
+    "triggerTaskOnSave.restart": true,
+    "rust-analyzer.cargo.features": "all",
+    "triggerTaskOnSave.tasks": {
+        // "rust: cargo build": ["**/*.rs"]
+    },
+    "lldb.displayFormat": "auto",
+    "lldb.dereferencePointers": true,
+    "lldb.consoleMode": "commands"
+}
