@@ -117,14 +117,8 @@ try {
     Write-Host "Processing AutoHotkey v2 base files..." -ForegroundColor White
     $v2ExtractPath = Join-Path $TempDir "v2_extract"
     
-    # Debug: Show v2 extract directory contents
-    Write-Host "  Examining v2 extract directory: $v2ExtractPath" -ForegroundColor Gray
+    Write-Host "  Searching for v2 executable files..." -ForegroundColor Gray
     if (Test-Path $v2ExtractPath) {
-        Write-Host "  Directory contents:" -ForegroundColor Gray
-        Get-ChildItem $v2ExtractPath -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
-            $relativePath = $_.FullName.Replace($v2ExtractPath, "")
-            Write-Host "    $relativePath" -ForegroundColor DarkGray
-        }
         
         # Search for all possible v2 executable files with multiple patterns
         $v2ExePatterns = @("AutoHotkey*.exe", "*.exe")
@@ -144,18 +138,11 @@ try {
             $fileName -eq "AutoHotkey.exe"
         }
         
-        Write-Host "  Found potential v2 executable files:" -ForegroundColor Cyan
         if ($v2ExeFiles.Count -eq 0) {
-            Write-Host "    No v2 executable files found!" -ForegroundColor Red
-            Write-Host "  Searching for ANY .exe files in v2 extract directory..." -ForegroundColor Yellow
-            $allExeFiles = Get-ChildItem $v2ExtractPath -Recurse -Name "*.exe" -ErrorAction SilentlyContinue
-            foreach ($exeFile in $allExeFiles) {
-                Write-Host "    Found .exe: $exeFile" -ForegroundColor Yellow
-            }
+            Write-Host "  ⚠ No standard v2 executable files found" -ForegroundColor Yellow
+            Write-Host "  Searching for any .exe files as fallback..." -ForegroundColor Yellow
         } else {
-            foreach ($exeFile in $v2ExeFiles) {
-                Write-Host "    $exeFile" -ForegroundColor Green
-            }
+            Write-Host "  ✓ Found $($v2ExeFiles.Count) potential v2 executable files" -ForegroundColor Green
         }
         
         # Process each found v2 executable
@@ -165,19 +152,13 @@ try {
                 $sourcePath = Join-Path $v2ExtractPath $exeFile
                 $fileName = Split-Path $exeFile -Leaf
                 
-                Write-Host "  Processing: $fileName" -ForegroundColor White
-                
                 # Enhanced v2-specific naming with more patterns
                 $newName = switch -Regex ($fileName) {
                     "^AutoHotkeyU32\.exe$" { "AutoHotkey_v2_Unicode32.exe" }
                     "^AutoHotkeyU64\.exe$" { "AutoHotkey_v2_Unicode64.exe" }
                     "^AutoHotkey32\.exe$" { "AutoHotkey_v2_Unicode32.exe" }
                     "^AutoHotkey64\.exe$" { "AutoHotkey_v2_Unicode64.exe" }
-                    "^AutoHotkey\.exe$" { 
-                        # Try to determine architecture from file properties or default to 32-bit
-                        Write-Host "    Detected generic AutoHotkey.exe, defaulting to 32-bit" -ForegroundColor Yellow
-                        "AutoHotkey_v2_Unicode32.exe" 
-                    }
+                    "^AutoHotkey\.exe$" { "AutoHotkey_v2_Unicode32.exe" }
                     "^ahk.*32.*\.exe$" { "AutoHotkey_v2_Unicode32.exe" }
                     "^ahk.*64.*\.exe$" { "AutoHotkey_v2_Unicode64.exe" }
                     default { 
@@ -193,11 +174,9 @@ try {
                 $destPath = Join-Path $compilerDir $newName
                 
                 # Check if we already have this target file
-                if (Test-Path $destPath) {
-                    Write-Host "    Target file already exists, skipping: $newName" -ForegroundColor Yellow
-                } else {
+                if (-not (Test-Path $destPath)) {
                     Copy-Item $sourcePath $destPath -Force
-                    Write-Host "    ✓ Copied $fileName -> $newName" -ForegroundColor Green
+                    Write-Host "  ✓ Copied $fileName -> $newName" -ForegroundColor Green
                     $v2FilesProcessed++
                 }
             }
@@ -206,11 +185,9 @@ try {
             }
         }
         
-        Write-Host "  Processed $v2FilesProcessed v2 base files" -ForegroundColor $(if ($v2FilesProcessed -gt 0) { "Green" } else { "Red" })
-        
         # If no files were processed, try a fallback approach
         if ($v2FilesProcessed -eq 0) {
-            Write-Host "  Attempting fallback: copying any .exe file as v2 base..." -ForegroundColor Yellow
+            Write-Host "  Attempting fallback approach..." -ForegroundColor Yellow
             $anyExe = Get-ChildItem $v2ExtractPath -Recurse -Name "*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
             if ($anyExe) {
                 try {
@@ -221,13 +198,19 @@ try {
                     Copy-Item $fallbackSource $fallbackDest32 -Force
                     Copy-Item $fallbackSource $fallbackDest64 -Force
                     
-                    Write-Host "    ✓ Fallback: copied $anyExe to both 32-bit and 64-bit v2 base files" -ForegroundColor Green
+                    Write-Host "  ✓ Fallback successful: created v2 base files" -ForegroundColor Green
                     $v2FilesProcessed = 2
                 }
                 catch {
-                    Write-Host "    ✗ Fallback failed: $($_.Exception.Message)" -ForegroundColor Red
+                    Write-Host "  ✗ Fallback failed: $($_.Exception.Message)" -ForegroundColor Red
                 }
             }
+        }
+        
+        if ($v2FilesProcessed -gt 0) {
+            Write-Host "  ✓ v2 base files ready" -ForegroundColor Green
+        } else {
+            Write-Host "  ⚠ v2 base files unavailable" -ForegroundColor Yellow
         }
     } else {
         Write-Host "  ✗ v2 extract directory not found: $v2ExtractPath" -ForegroundColor Red
@@ -279,15 +262,11 @@ try {
     
     # Verify GITHUB_ENV and GITHUB_PATH exist before writing
     if (-not $env:GITHUB_ENV) {
-        Write-Warning "GITHUB_ENV environment variable not found. This might not be running in GitHub Actions."
-    } else {
-        Write-Host "GITHUB_ENV path: $env:GITHUB_ENV" -ForegroundColor Gray
+        Write-Warning "GITHUB_ENV not found - not running in GitHub Actions context"
     }
     
     if (-not $env:GITHUB_PATH) {
-        Write-Warning "GITHUB_PATH environment variable not found. This might not be running in GitHub Actions."
-    } else {
-        Write-Host "GITHUB_PATH path: $env:GITHUB_PATH" -ForegroundColor Gray
+        Write-Warning "GITHUB_PATH not found - not running in GitHub Actions context"
     }
     
     # Add compiler directory to PATH
@@ -303,17 +282,12 @@ try {
     
     # Set environment variables
     if ($env:GITHUB_ENV) {
-        Write-Host "Writing environment variables to: $env:GITHUB_ENV" -ForegroundColor Gray
-        
-        # Write environment variables using correct method
         try {
             Add-Content -Path $env:GITHUB_ENV -Value "AHK_UNIFIED_PATH=$InstallPath" -Encoding UTF8
             Add-Content -Path $env:GITHUB_ENV -Value "AHK_COMPILER_PATH=$compilerDir" -Encoding UTF8
             Add-Content -Path $env:GITHUB_ENV -Value "AHK_INSTALL_SUCCESS=true" -Encoding UTF8
             
-            Write-Host "  ✓ Set AHK_UNIFIED_PATH=$InstallPath" -ForegroundColor Green
-            Write-Host "  ✓ Set AHK_COMPILER_PATH=$compilerDir" -ForegroundColor Green
-            Write-Host "  ✓ Set AHK_INSTALL_SUCCESS=true" -ForegroundColor Green
+            Write-Host "  ✓ Environment variables configured" -ForegroundColor Green
         }
         catch {
             Write-Error "Failed to write environment variables: $($_.Exception.Message)"
@@ -322,38 +296,14 @@ try {
         
         # Verify the environment file was written correctly
         if (Test-Path $env:GITHUB_ENV) {
-            Write-Host "Verifying GITHUB_ENV file contents..." -ForegroundColor Gray
             $envContent = Get-Content $env:GITHUB_ENV -Raw -ErrorAction SilentlyContinue
-            
-            Write-Host "Current GITHUB_ENV content:" -ForegroundColor Gray
-            Write-Host "--- START ---" -ForegroundColor DarkGray
-            Write-Host $envContent -ForegroundColor DarkGray
-            Write-Host "--- END ---" -ForegroundColor DarkGray
             
             $hasUnifiedPath = $envContent -match "AHK_UNIFIED_PATH="
             $hasCompilerPath = $envContent -match "AHK_COMPILER_PATH="
             $hasInstallSuccess = $envContent -match "AHK_INSTALL_SUCCESS=true"
             
-            if ($hasUnifiedPath) {
-                Write-Host "  ✓ AHK_UNIFIED_PATH found in GITHUB_ENV" -ForegroundColor Green
-            } else {
-                Write-Host "  ✗ AHK_UNIFIED_PATH missing from GITHUB_ENV" -ForegroundColor Red
-            }
-            
-            if ($hasCompilerPath) {
-                Write-Host "  ✓ AHK_COMPILER_PATH found in GITHUB_ENV" -ForegroundColor Green
-            } else {
-                Write-Host "  ✗ AHK_COMPILER_PATH missing from GITHUB_ENV" -ForegroundColor Red
-            }
-            
-            if ($hasInstallSuccess) {
-                Write-Host "  ✓ AHK_INSTALL_SUCCESS found in GITHUB_ENV" -ForegroundColor Green
-            } else {
-                Write-Host "  ✗ AHK_INSTALL_SUCCESS missing from GITHUB_ENV" -ForegroundColor Red
-            }
-            
             if ($hasUnifiedPath -and $hasCompilerPath -and $hasInstallSuccess) {
-                Write-Host "  ✓ All environment variables written to GITHUB_ENV successfully" -ForegroundColor Green
+                Write-Host "  ✓ Environment variables set successfully" -ForegroundColor Green
             } else {
                 Write-Warning "Some environment variables are missing from GITHUB_ENV file"
                 throw "Environment variable verification failed"
