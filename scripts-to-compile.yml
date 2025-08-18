@@ -18,12 +18,13 @@ ahk_v1:
   # AutoHotkey v1.1 scripts - compiled for both x86 and x64
   # - "IME Switch/ime_switch.ahk"
   # - "VirtualDesktopAccessor/example.ahk"
-  - "keyboard_redefine/hhkb.ahk"
-  - "keyboard_redefine/2.4GMouse.ahk"
+  # - "keyboard_redefine/hhkb.ahk"
+  # - "keyboard_redefine/2.4GMouse.ahk"
   - "left click.ahk"
   # - "man_lost_job.ahk"
 
 ahk_v2:
   # AutoHotkey v2.0 scripts - compiled for both x86 and x64
-  - path: "VirtualDesktopAccessor/exe/virtual_desktop.ah2"
-    deps: "VirtualDesktopAccessor/exe/VirtualDesktopAccessor.dll"
+  - path: "VirtualDesktopAccessor/virtual_desktop.ah2"
+    deps: "VirtualDesktopAccessor/VirtualDesktopAccessor.dll"
+    # https://github.com/Ciantic/VirtualDesktopAccessor/releases/
