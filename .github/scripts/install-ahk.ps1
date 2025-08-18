@@ -155,6 +155,6 @@ try {
     }
 }
 catch {
-    Write-Error "Error installing AutoHotkey $displayName: $($_.Exception.Message)"
+    Write-Error "Error installing AutoHotkey ${displayName}: $($_.Exception.Message)"
     exit 1
 }
