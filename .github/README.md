@@ -6,9 +6,11 @@ This GitHub Actions workflow automatically compiles AutoHotkey scripts to execut
 
 - ✅ **Multi-Version Support**: AutoHotkey v1.1 and v2.0
 - ✅ **Multi-Architecture**: 32-bit and 64-bit compilation for each script
+- ✅ **Dependency Management**: Automatic copying of DLL files and other dependencies alongside executables
+- ✅ **Flexible Configuration**: Support for both simple script paths and complex objects with dependencies
 - ✅ **Section-Based Configuration**: Organize scripts by version in configuration file
-- ✅ **Structured Output**: Clear directory organization by version and architecture
-- ✅ **Multiple Artifacts**: Separate uploads for different combinations
+- ✅ **Structured Output**: Clear directory organization by architecture
+- ✅ **Version-Architecture Naming**: Executables are named with version and architecture suffixes
 - ✅ **Auto-Release**: Tag-triggered releases with detailed descriptions
 
 ## How it works
@@ -31,12 +33,8 @@ This GitHub Actions workflow automatically compiles AutoHotkey scripts to execut
 4. **Output Structure**:
    ```
    compiled/
-   ├── v1/
-   │   ├── x86/    # v1.1 32-bit executables
-   │   └── x64/    # v1.1 64-bit executables
-   └── v2/
-       ├── x86/    # v2.0 32-bit executables
-       └── x64/    # v2.0 64-bit executables
+   ├── x86/    # 32-bit executables (both v1 and v2) with dependencies
+   └── x64/    # 64-bit executables (both v1 and v2) with dependencies
    ```
 
 ## Configuration
@@ -46,26 +44,37 @@ This GitHub Actions workflow automatically compiles AutoHotkey scripts to execut
 # AutoHotkey scripts compilation configuration
 # This file defines which scripts to compile for each AutoHotkey version
 # Each script will be compiled for both x86 (32-bit) and x64 (64-bit) architectures
+#
+# Configuration formats supported:
+# 1. Simple string format (no dependencies):
+#    - "path/to/script.ahk"
+# 2. Object format with single dependency:
+#    - path: "path/to/script.ahk"
+#      deps: "path/to/dependency.dll"
+# 3. Object format with multiple dependencies:
+#    - path: "path/to/script.ahk"
+#      deps:
+#        - "path/to/dependency1.dll"
+#        - "path/to/dependency2.dll"
 
 ahk_v1:
   # AutoHotkey v1.1 scripts - compiled for both x86 and x64
-  - "IME Switch/ime_switch.ahk"
-  - "VirtualDesktopAccessor/example.ahk"
   - "keyboard_redefine/hhkb.ahk"
   - "keyboard_redefine/2.4GMouse.ahk"
   - "left click.ahk"
-  - "man_lost_job.ahk"
 
 ahk_v2:
   # AutoHotkey v2.0 scripts - compiled for both x86 and x64
-  - "VirtualDesktopAccessor/example.ah2"
-  - "VirtualDesktopAccessor/exe/virtual_desktop.ah2"
+  - path: "VirtualDesktopAccessor/exe/virtual_desktop.ah2"
+    deps: "VirtualDesktopAccessor/exe/VirtualDesktopAccessor.dll"
 ```
 
 ### Configuration Rules:
 - Use `ahk_v1` section for AutoHotkey v1.1 scripts (usually `.ahk` files)
 - Use `ahk_v2` section for AutoHotkey v2.0 scripts (usually `.ah2` files)
-- Script paths are listed as YAML array items with quotes
+- Script paths can be in simple string format or object format with dependencies
+- For scripts with dependencies, use object format with `path` and `deps` fields
+- Dependencies (DLL files, etc.) are automatically copied to the output directory alongside executables
 - All paths are relative to repository root
 - Comments start with `#` and are ignored
 - Standard YAML syntax applies
@@ -78,24 +87,20 @@ ahk_v2:
 
 ## Output Files
 
-Each script generates 4 executable files:
-- `scriptname_x86.exe` (v1 32-bit)
-- `scriptname_x64.exe` (v1 64-bit)
-- `scriptname_x86.exe` (v2 32-bit)  
-- `scriptname_x64.exe` (v2 64-bit)
+Each script generates executable files with version and architecture suffixes:
+- `scriptname-v1-x86.exe` (v1 32-bit)
+- `scriptname-v1-x64.exe` (v1 64-bit)
+- `scriptname-v2-x86.exe` (v2 32-bit)  
+- `scriptname-v2-x64.exe` (v2 64-bit)
+
+Scripts with dependencies will have their dependency files (DLL, etc.) copied to the same directory as the executable.
 
 ## Artifacts
 
-The workflow creates multiple artifacts for easy download:
+The workflow creates a single artifact containing all compiled executables:
+- `ahkexe-{run-number}-{timestamp}` - All compiled executables organized by architecture with their dependencies
 
-1. **Version-Architecture Specific**:
-   - `ahk-v1-x86-executables` - AutoHotkey v1.1 32-bit files
-   - `ahk-v1-x64-executables` - AutoHotkey v1.1 64-bit files
-   - `ahk-v2-x86-executables` - AutoHotkey v2.0 32-bit files
-   - `ahk-v2-x64-executables` - AutoHotkey v2.0 64-bit files
-
-2. **Combined**:
-   - `all-compiled-executables` - All files in organized structure
+The artifact contains the complete compiled/ directory structure with x86/ and x64/ subdirectories.
 
 ## Release Notes
 
