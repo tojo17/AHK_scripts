@@ -15,6 +15,45 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
     
+    - name: Get AutoHotkey versions
+      id: get-versions
+      shell: powershell
+      run: |
+        # Get latest v1.1.x release
+        $v1Releases = Invoke-RestMethod -Uri "https://api.github.com/repos/AutoHotkey/AutoHotkey/releases" -Headers @{ "User-Agent" = "PowerShell" }
+        $v1Release = $v1Releases | Where-Object { $_.tag_name -match "^v1\.1\." } | Select-Object -First 1
+        
+        # Get latest v2.x release (stable only)
+        $v2Release = $v1Releases | Where-Object { $_.tag_name -match "^v2\." -and -not $_.prerelease } | Select-Object -First 1
+        
+        $v1Version = $v1Release.tag_name
+        $v2Version = $v2Release.tag_name
+        
+        Write-Host "Latest v1.1.x version: $v1Version"
+        Write-Host "Latest v2.x version: $v2Version"
+        
+        # Set outputs for caching
+        echo "v1-version=$v1Version" >> $env:GITHUB_OUTPUT
+        echo "v2-version=$v2Version" >> $env:GITHUB_OUTPUT
+    
+    - name: Cache AutoHotkey v1.1 installer
+      id: cache-ahk-v1
+      uses: actions/cache@v4
+      with:
+        path: ${{ runner.temp }}/ahk-installers/v1
+        key: ahk-v1-installer-${{ steps.get-versions.outputs.v1-version }}
+        restore-keys: |
+          ahk-v1-installer-
+    
+    - name: Cache AutoHotkey v2.0 installer
+      id: cache-ahk-v2
+      uses: actions/cache@v4
+      with:
+        path: ${{ runner.temp }}/ahk-installers/v2
+        key: ahk-v2-installer-${{ steps.get-versions.outputs.v2-version }}
+        restore-keys: |
+          ahk-v2-installer-
+    
     - name: Download and install AutoHotkey v1.1
       shell: powershell
       run: .\.github\scripts\install-ahk-v1.ps1

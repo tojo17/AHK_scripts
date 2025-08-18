@@ -2,7 +2,8 @@
 # This script downloads and installs AutoHotkey v2.0 for GitHub Actions
 
 param(
-    [string]$TempDir = $env:TEMP
+    [string]$TempDir = $env:TEMP,
+    [string]$CacheDir = "$env:RUNNER_TEMP/ahk-installers/v2"
 )
 
 Write-Host "Installing AutoHotkey v2.0..."
@@ -32,21 +33,36 @@ try {
         exit 1
     }
     
-    $url = $setupAsset.browser_download_url
+    # Check cache first
+    $cachedInstaller = Join-Path $CacheDir "ahk2-install.exe"
     $output = Join-Path $TempDir "ahk2-install.exe"
     
-    Write-Host "Downloading from: $url"
-    Write-Host "Saving to: $output"
-    
-    try {
-        Invoke-WebRequest -Uri $url -OutFile $output -ErrorAction Stop
-    }
-    catch {
-        Write-Host "Failed to download from direct URL, trying latest download link..."
-        # Fallback to latest download link
-        $fallbackUrl = "https://github.com/AutoHotkey/AutoHotkey/releases/latest/download/AutoHotkey_${version}_setup.exe"
-        Write-Host "Fallback URL: $fallbackUrl"
-        Invoke-WebRequest -Uri $fallbackUrl -OutFile $output
+    if (Test-Path $cachedInstaller) {
+        Write-Host "✓ Using cached installer from: $cachedInstaller"
+        Copy-Item $cachedInstaller $output
+    } else {
+        Write-Host "Cache miss - downloading installer..."
+        
+        $url = $setupAsset.browser_download_url
+        
+        Write-Host "Downloading from: $url"
+        Write-Host "Saving to: $output"
+        
+        try {
+            Invoke-WebRequest -Uri $url -OutFile $output -ErrorAction Stop
+        }
+        catch {
+            Write-Host "Failed to download from direct URL, trying latest download link..."
+            # Fallback to latest download link
+            $fallbackUrl = "https://github.com/AutoHotkey/AutoHotkey/releases/latest/download/AutoHotkey_${version}_setup.exe"
+            Write-Host "Fallback URL: $fallbackUrl"
+            Invoke-WebRequest -Uri $fallbackUrl -OutFile $output
+        }
+        
+        # Cache the downloaded installer
+        Write-Host "Caching installer to: $cachedInstaller"
+        New-Item -ItemType Directory -Force -Path $CacheDir | Out-Null
+        Copy-Item $output $cachedInstaller
     }
     
     # Install AutoHotkey v2.0 silently

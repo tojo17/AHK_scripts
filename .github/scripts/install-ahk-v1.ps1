@@ -2,7 +2,8 @@
 # This script downloads and installs AutoHotkey v1.1 for GitHub Actions
 
 param(
-    [string]$TempDir = $env:TEMP
+    [string]$TempDir = $env:TEMP,
+    [string]$CacheDir = "$env:RUNNER_TEMP/ahk-installers/v1"
 )
 
 Write-Host "Installing AutoHotkey v1.1..."
@@ -24,25 +25,39 @@ try {
     $version = $v1Release.tag_name
     Write-Host "Found latest v1.1.x version: $version"
     
-    # Look for installer asset in the release
-    $installerAsset = $v1Release.assets | Where-Object { $_.name -match ".*setup.*\.exe$|.*install.*\.exe$" } | Select-Object -First 1
-    
-    if ($installerAsset) {
-        # Use GitHub release asset
-        $url = $installerAsset.browser_download_url
-        Write-Host "Using GitHub release installer: $($installerAsset.name)"
-    } else {
-        # Fall back to official website if no installer asset found
-        Write-Host "No installer asset found in GitHub release, falling back to official website"
-        $url = "https://www.autohotkey.com/download/ahk-install.exe"
-    }
-    
+    # Check cache first
+    $cachedInstaller = Join-Path $CacheDir "ahk-install.exe"
     $output = Join-Path $TempDir "ahk-install.exe"
     
-    Write-Host "Downloading from: $url"
-    Write-Host "Saving to: $output"
-    
-    Invoke-WebRequest -Uri $url -OutFile $output
+    if (Test-Path $cachedInstaller) {
+        Write-Host "✓ Using cached installer from: $cachedInstaller"
+        Copy-Item $cachedInstaller $output
+    } else {
+        Write-Host "Cache miss - downloading installer..."
+        
+        # Look for installer asset in the release
+        $installerAsset = $v1Release.assets | Where-Object { $_.name -match ".*setup.*\.exe$|.*install.*\.exe$" } | Select-Object -First 1
+        
+        if ($installerAsset) {
+            # Use GitHub release asset
+            $url = $installerAsset.browser_download_url
+            Write-Host "Using GitHub release installer: $($installerAsset.name)"
+        } else {
+            # Fall back to official website if no installer asset found
+            Write-Host "No installer asset found in GitHub release, falling back to official website"
+            $url = "https://www.autohotkey.com/download/ahk-install.exe"
+        }
+        
+        Write-Host "Downloading from: $url"
+        Write-Host "Saving to: $output"
+        
+        Invoke-WebRequest -Uri $url -OutFile $output
+        
+        # Cache the downloaded installer
+        Write-Host "Caching installer to: $cachedInstaller"
+        New-Item -ItemType Directory -Force -Path $CacheDir | Out-Null
+        Copy-Item $output $cachedInstaller
+    }
     
     # Install AutoHotkey v1.1 silently
     Write-Host "Installing AutoHotkey v1.1 silently..."
