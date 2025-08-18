@@ -1,5 +1,6 @@
-# Compile AutoHotkey Scripts
-# This script parses YAML configuration and compiles AutoHotkey scripts for both v1 and v2
+# Compile AutoHotkey Scripts with Unified Compiler
+# This script uses a unified Ahk2Exe compiler to compile both v1 and v2 scripts
+# It automatically selects the appropriate base file based on script version and architecture
 
 param(
     [string]$ConfigFile = "scripts-to-compile.yml",
@@ -21,9 +22,24 @@ if (-not (Test-Path $ConfigFile)) {
     exit 1
 }
 
+Write-Host "=== AutoHotkey Script Compilation with Unified Compiler ===" -ForegroundColor Magenta
 Write-Host "Reading YAML configuration from: $ConfigFile"
 
 try {
+    # Verify unified compiler environment
+    if (-not $env:AHK_COMPILER_PATH) {
+        Write-Error "AHK_COMPILER_PATH environment variable not found. Please run install-ahk.ps1 first."
+        exit 1
+    }
+    
+    $compilerPath = Join-Path $env:AHK_COMPILER_PATH "Ahk2Exe.exe"
+    if (-not (Test-Path $compilerPath)) {
+        Write-Error "Unified compiler not found at: $compilerPath"
+        exit 1
+    }
+    
+    Write-Host "Using unified compiler: $compilerPath" -ForegroundColor Green
+    
     # Read and parse YAML configuration
     $yamlContent = Get-Content $ConfigFile -Raw
     $config = ConvertFrom-Yaml $yamlContent
@@ -34,12 +50,12 @@ try {
     
     if ($config.ContainsKey("ahk_v1") -and $config.ahk_v1) {
         $v1Scripts = $config.ahk_v1
-        Write-Host "Found $($v1Scripts.Count) v1 scripts"
+        Write-Host "Found $($v1Scripts.Count) v1 scripts" -ForegroundColor Green
     }
     
     if ($config.ContainsKey("ahk_v2") -and $config.ahk_v2) {
         $v2Scripts = $config.ahk_v2
-        Write-Host "Found $($v2Scripts.Count) v2 scripts"
+        Write-Host "Found $($v2Scripts.Count) v2 scripts" -ForegroundColor Green
     }
     
     Write-Host "Total: $($v1Scripts.Count) v1 scripts and $($v2Scripts.Count) v2 scripts"
@@ -48,9 +64,29 @@ try {
     $totalSuccess = 0
     $totalFail = 0
     
-    # Function to compile script with specific version and architecture
+    # Function to get base file path for compilation
+    function Get-BaseFilePath {
+        param($version, $arch)
+        
+        $baseFileName = switch ("$version-$arch") {
+            "v1-x86" { "AutoHotkey_v1_Unicode32.bin" }
+            "v1-x64" { "AutoHotkey_v1_Unicode64.bin" }
+            "v2-x86" { "AutoHotkey_v2_Unicode32.bin" }
+            "v2-x64" { "AutoHotkey_v2_Unicode64.bin" }
+            default { throw "Unknown version-arch combination: $version-$arch" }
+        }
+        
+        $baseFilePath = Join-Path $env:AHK_COMPILER_PATH $baseFileName
+        if (-not (Test-Path $baseFilePath)) {
+            throw "Base file not found: $baseFilePath"
+        }
+        
+        return $baseFilePath
+    }
+    
+    # Function to compile script with unified compiler  
     function Compile-Script {
-        param($scriptPath, $version, $arch, $compilerPath)
+        param($scriptPath, $version, $arch)
         
         if (-not (Test-Path $scriptPath)) {
             Write-Host "ERROR: Script not found: $scriptPath" -ForegroundColor Red
@@ -75,25 +111,20 @@ try {
         Write-Host "Compiling [$version-$arch]: $scriptPath -> $outputPath" -ForegroundColor Cyan
         
         try {
+            # Get appropriate base file
+            $baseFilePath = Get-BaseFilePath -version $version -arch $arch
+            Write-Host "  Using base file: $(Split-Path $baseFilePath -Leaf)" -ForegroundColor Gray
+            
+            # Build arguments for Ahk2Exe
             $arguments = @(
                 "/in", "`"$scriptPath`""
                 "/out", "`"$outputPath`""
+                "/base", "`"$baseFilePath`""
             )
             
-            # Add architecture-specific arguments for v1
-            if ($version -eq "v1") {
-                if ($arch -eq "x64") {
-                    $binPath = Join-Path $env:AHK_V1_PATH "Compiler\Unicode 64-bit.bin"
-                    $arguments += "/bin", "`"$binPath`""
-                } else {
-                    $binPath = Join-Path $env:AHK_V1_PATH "Compiler\Unicode 32-bit.bin"
-                    $arguments += "/bin", "`"$binPath`""
-                }
-            }
-            
             # Execute compilation
-            $tempOutput = Join-Path $env:TEMP "compile_output.txt"
-            $tempError = Join-Path $env:TEMP "compile_error.txt"
+            $tempOutput = Join-Path $env:TEMP "compile_output_$(Get-Random).txt"
+            $tempError = Join-Path $env:TEMP "compile_error_$(Get-Random).txt"
             
             $process = Start-Process -FilePath $compilerPath -ArgumentList $arguments -Wait -PassThru -NoNewWindow -RedirectStandardOutput $tempOutput -RedirectStandardError $tempError
             
@@ -105,11 +136,20 @@ try {
                 
                 # Display error output if available
                 if (Test-Path $tempError) {
-                    $errorContent = Get-Content $tempError -Raw
+                    $errorContent = Get-Content $tempError -Raw -ErrorAction SilentlyContinue
                     if ($errorContent -and $errorContent.Trim()) { 
-                        Write-Host "Error output: $errorContent" -ForegroundColor Yellow
+                        Write-Host "  Error output: $errorContent" -ForegroundColor Yellow
                     }
                 }
+                
+                # Display standard output for additional context
+                if (Test-Path $tempOutput) {
+                    $outputContent = Get-Content $tempOutput -Raw -ErrorAction SilentlyContinuous
+                    if ($outputContent -and $outputContent.Trim()) {
+                        Write-Host "  Compiler output: $outputContent" -ForegroundColor Yellow
+                    }
+                }
+                
                 return $false
             }
         }
@@ -117,76 +157,60 @@ try {
             Write-Host "✗ ERROR: Exception while compiling $scriptPath [$version-$arch]: $($_.Exception.Message)" -ForegroundColor Red
             return $false
         }
-    }
-    
-    # Compile v1 scripts
-    if ($v1Scripts.Count -gt 0) {
-        Write-Host ""
-        Write-Host "=== Compiling AutoHotkey v1 Scripts ===" -ForegroundColor Magenta
-        
-        $ahk2exe = Join-Path $env:AHK_V1_PATH "Ahk2Exe.exe"
-        if (-not (Test-Path $ahk2exe)) {
-            Write-Error "Ahk2Exe.exe not found at: $ahk2exe"
-            $totalFail += ($v1Scripts.Count * 2)
-        } else {
-            Write-Host "Using compiler: $ahk2exe"
-            
-            foreach ($script in $v1Scripts) {
-                # Compile both 32-bit and 64-bit versions
-                if (Compile-Script -scriptPath $script -version "v1" -arch "x86" -compilerPath $ahk2exe) {
-                    $totalSuccess++
-                } else {
-                    $totalFail++
-                }
-                
-                if (Compile-Script -scriptPath $script -version "v1" -arch "x64" -compilerPath $ahk2exe) {
-                    $totalSuccess++
-                } else {
-                    $totalFail++
-                }
-            }
+        finally {
+            # Clean up temp files
+            Remove-Item $tempOutput -ErrorAction SilentlyContinue
+            Remove-Item $tempError -ErrorAction SilentlyContinue
         }
     }
     
-    # Compile v2 scripts
-    if ($v2Scripts.Count -gt 0) {
-        Write-Host ""
-        Write-Host "=== Compiling AutoHotkey v2 Scripts ===" -ForegroundColor Magenta
+    # Compile all scripts using unified approach
+    $allScripts = @()
+    
+    # Add v1 scripts
+    foreach ($script in $v1Scripts) {
+        $allScripts += @{ Script = $script; Version = "v1" }
+    }
+    
+    # Add v2 scripts
+    foreach ($script in $v2Scripts) {
+        $allScripts += @{ Script = $script; Version = "v2" }
+    }
+    
+    if ($allScripts.Count -eq 0) {
+        Write-Host "No scripts found to compile." -ForegroundColor Yellow
+        exit 0
+    }
+    
+    Write-Host ""
+    Write-Host "=== Starting Compilation Process ===" -ForegroundColor Magenta
+    Write-Host "Total scripts to compile: $($allScripts.Count)"
+    Write-Host "Architectures: x86, x64"
+    Write-Host "Total compilation tasks: $($allScripts.Count * 2)"
+    Write-Host ""
+    
+    # Compile each script for both architectures
+    foreach ($scriptInfo in $allScripts) {
+        $script = $scriptInfo.Script
+        $version = $scriptInfo.Version
         
-        # For v2, find suitable compiler
-        $ahk2exeV2 = $null
-        $possibleCompilers = @(
-            (Join-Path $env:AHK_V2_PATH "Ahk2Exe.exe"),
-            (Join-Path $env:AHK_V1_PATH "Ahk2Exe.exe")  # v1 compiler can compile v2 scripts too
-        )
+        Write-Host "Processing: $script ($version)" -ForegroundColor White
         
-        foreach ($compiler in $possibleCompilers) {
-            if (Test-Path $compiler) {
-                $ahk2exeV2 = $compiler
-                Write-Host "Using compiler: $ahk2exeV2"
-                break
-            }
-        }
-        
-        if (-not $ahk2exeV2) {
-            Write-Error "No suitable compiler found for v2 scripts"
-            $totalFail += ($v2Scripts.Count * 2)
+        # Compile for x86
+        if (Compile-Script -scriptPath $script -version $version -arch "x86") {
+            $totalSuccess++
         } else {
-            foreach ($script in $v2Scripts) {
-                # Compile both architectures for v2
-                if (Compile-Script -scriptPath $script -version "v2" -arch "x86" -compilerPath $ahk2exeV2) {
-                    $totalSuccess++
-                } else {
-                    $totalFail++
-                }
-                
-                if (Compile-Script -scriptPath $script -version "v2" -arch "x64" -compilerPath $ahk2exeV2) {
-                    $totalSuccess++
-                } else {
-                    $totalFail++
-                }
-            }
+            $totalFail++
         }
+        
+        # Compile for x64
+        if (Compile-Script -scriptPath $script -version $version -arch "x64") {
+            $totalSuccess++
+        } else {
+            $totalFail++
+        }
+        
+        Write-Host ""
     }
     
     # Summary
@@ -196,14 +220,20 @@ try {
     Write-Host "  Failed: $totalFail" -ForegroundColor Red
     Write-Host "  Total: $($totalSuccess + $totalFail)"
     
+    $successRate = if (($totalSuccess + $totalFail) -gt 0) { 
+        [math]::Round(($totalSuccess / ($totalSuccess + $totalFail)) * 100, 1) 
+    } else { 0 }
+    Write-Host "  Success Rate: $successRate%" -ForegroundColor $(if ($successRate -ge 90) { "Green" } elseif ($successRate -ge 70) { "Yellow" } else { "Red" })
+    
     if ($totalFail -gt 0) {
-        Write-Host "::warning::Some scripts failed to compile"
+        Write-Host "::warning::$totalFail compilation tasks failed"
     }
     
     # Set environment variables for GitHub Actions
     if ($env:GITHUB_ENV) {
         Write-Host "SUCCESS_COUNT=$totalSuccess" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
         Write-Host "FAIL_COUNT=$totalFail" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        Write-Host "SUCCESS_RATE=$successRate" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
     }
     
     # Exit with appropriate code
