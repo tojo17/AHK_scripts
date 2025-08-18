@@ -178,27 +178,75 @@ try {
     
     # Add compiler directory to PATH
     if ($env:GITHUB_PATH) {
-        Write-Host "$InstallPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-        Write-Host "  ✓ Added to PATH: $InstallPath" -ForegroundColor Green
+        try {
+            Add-Content -Path $env:GITHUB_PATH -Value $InstallPath -Encoding UTF8
+            Write-Host "  ✓ Added to PATH: $InstallPath" -ForegroundColor Green
+        }
+        catch {
+            Write-Warning "Failed to add to PATH: $($_.Exception.Message)"
+        }
     }
     
     # Set environment variables
     if ($env:GITHUB_ENV) {
-        Write-Host "AHK_UNIFIED_PATH=$InstallPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        Write-Host "AHK_COMPILER_PATH=$compilerDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        Write-Host "AHK_INSTALL_SUCCESS=true" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        Write-Host "  ✓ Set AHK_UNIFIED_PATH=$InstallPath" -ForegroundColor Green
-        Write-Host "  ✓ Set AHK_COMPILER_PATH=$compilerDir" -ForegroundColor Green
-        Write-Host "  ✓ Set AHK_INSTALL_SUCCESS=true" -ForegroundColor Green
+        Write-Host "Writing environment variables to: $env:GITHUB_ENV" -ForegroundColor Gray
+        
+        # Write environment variables using correct method
+        try {
+            Add-Content -Path $env:GITHUB_ENV -Value "AHK_UNIFIED_PATH=$InstallPath" -Encoding UTF8
+            Add-Content -Path $env:GITHUB_ENV -Value "AHK_COMPILER_PATH=$compilerDir" -Encoding UTF8
+            Add-Content -Path $env:GITHUB_ENV -Value "AHK_INSTALL_SUCCESS=true" -Encoding UTF8
+            
+            Write-Host "  ✓ Set AHK_UNIFIED_PATH=$InstallPath" -ForegroundColor Green
+            Write-Host "  ✓ Set AHK_COMPILER_PATH=$compilerDir" -ForegroundColor Green
+            Write-Host "  ✓ Set AHK_INSTALL_SUCCESS=true" -ForegroundColor Green
+        }
+        catch {
+            Write-Error "Failed to write environment variables: $($_.Exception.Message)"
+            throw
+        }
         
         # Verify the environment file was written correctly
         if (Test-Path $env:GITHUB_ENV) {
+            Write-Host "Verifying GITHUB_ENV file contents..." -ForegroundColor Gray
             $envContent = Get-Content $env:GITHUB_ENV -Raw -ErrorAction SilentlyContinue
-            if ($envContent -match "AHK_COMPILER_PATH=") {
-                Write-Host "  ✓ Environment variables written to GITHUB_ENV successfully" -ForegroundColor Green
+            
+            Write-Host "Current GITHUB_ENV content:" -ForegroundColor Gray
+            Write-Host "--- START ---" -ForegroundColor DarkGray
+            Write-Host $envContent -ForegroundColor DarkGray
+            Write-Host "--- END ---" -ForegroundColor DarkGray
+            
+            $hasUnifiedPath = $envContent -match "AHK_UNIFIED_PATH="
+            $hasCompilerPath = $envContent -match "AHK_COMPILER_PATH="
+            $hasInstallSuccess = $envContent -match "AHK_INSTALL_SUCCESS=true"
+            
+            if ($hasUnifiedPath) {
+                Write-Host "  ✓ AHK_UNIFIED_PATH found in GITHUB_ENV" -ForegroundColor Green
             } else {
-                Write-Warning "Failed to verify AHK_COMPILER_PATH in GITHUB_ENV file"
+                Write-Host "  ✗ AHK_UNIFIED_PATH missing from GITHUB_ENV" -ForegroundColor Red
             }
+            
+            if ($hasCompilerPath) {
+                Write-Host "  ✓ AHK_COMPILER_PATH found in GITHUB_ENV" -ForegroundColor Green
+            } else {
+                Write-Host "  ✗ AHK_COMPILER_PATH missing from GITHUB_ENV" -ForegroundColor Red
+            }
+            
+            if ($hasInstallSuccess) {
+                Write-Host "  ✓ AHK_INSTALL_SUCCESS found in GITHUB_ENV" -ForegroundColor Green
+            } else {
+                Write-Host "  ✗ AHK_INSTALL_SUCCESS missing from GITHUB_ENV" -ForegroundColor Red
+            }
+            
+            if ($hasUnifiedPath -and $hasCompilerPath -and $hasInstallSuccess) {
+                Write-Host "  ✓ All environment variables written to GITHUB_ENV successfully" -ForegroundColor Green
+            } else {
+                Write-Warning "Some environment variables are missing from GITHUB_ENV file"
+                throw "Environment variable verification failed"
+            }
+        } else {
+            Write-Error "GITHUB_ENV file not found at: $env:GITHUB_ENV"
+            throw "GITHUB_ENV file not accessible"
         }
     }
     
