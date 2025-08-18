@@ -15,7 +15,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
     
-    - name: Setup Unified AutoHotkey Compiler
+    - name: Setup AutoHotkey Compiler
       shell: pwsh
       run: .\.github\scripts\install-ahk.ps1
     

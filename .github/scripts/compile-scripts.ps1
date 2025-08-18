@@ -1,5 +1,5 @@
-# Compile AutoHotkey Scripts with Unified Compiler
-# This script uses a unified Ahk2Exe compiler to compile both v1 and v2 scripts
+# Compile AutoHotkey Scripts
+# This script uses Ahk2Exe compiler to compile both v1 and v2 scripts
 # It automatically selects the appropriate base file based on script version and architecture
 
 param(
@@ -22,11 +22,11 @@ if (-not (Test-Path $ConfigFile)) {
     exit 1
 }
 
-Write-Host "=== AutoHotkey Script Compilation with Unified Compiler ===" -ForegroundColor Magenta
+Write-Host "=== AutoHotkey Script Compilation ===" -ForegroundColor Magenta
 Write-Host "Reading YAML configuration from: $ConfigFile"
 
 try {
-    # Verify unified compiler environment
+    # Verify compiler environment
     if (-not $env:AHK_COMPILER_PATH) {
         Write-Error "AHK_COMPILER_PATH environment variable not found. Please run install-ahk.ps1 first."
         exit 1
@@ -34,11 +34,11 @@ try {
     
     $compilerPath = Join-Path $env:AHK_COMPILER_PATH "Ahk2Exe.exe"
     if (-not (Test-Path $compilerPath)) {
-        Write-Error "Unified compiler not found at: $compilerPath"
+        Write-Error "Compiler not found at: $compilerPath"
         exit 1
     }
     
-    Write-Host "Using unified compiler: $compilerPath" -ForegroundColor Green
+    Write-Host "Using compiler: $compilerPath" -ForegroundColor Green
     
     # Read and parse YAML configuration
     $yamlContent = Get-Content $ConfigFile -Raw
@@ -92,7 +92,7 @@ try {
         return $baseFilePath
     }
     
-    # Function to compile script with unified compiler  
+    # Function to compile script  
     function Compile-Script {
         param($scriptPath, $version, $arch)
         
@@ -172,7 +172,7 @@ try {
         }
     }
     
-    # Compile all scripts using unified approach
+    # Compile all scripts
     $allScripts = @()
     
     # Add v1 scripts

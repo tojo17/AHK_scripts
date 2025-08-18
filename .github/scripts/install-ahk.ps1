@@ -1,15 +1,15 @@
-# Setup Unified AutoHotkey Compiler Environment
-# This script sets up a unified AutoHotkey compilation environment with:
+# Setup AutoHotkey Compiler Environment
+# This script sets up an AutoHotkey compilation environment with:
 # - One Ahk2Exe compiler (universal for v1 and v2)
 # - Base files for both v1 and v2 in x86 and x64 architectures
 
 param(
     [string]$TempDir = $env:TEMP,
-    [string]$CacheDir = "$env:RUNNER_TEMP/ahk-unified-cache",
-    [string]$InstallPath = "$env:RUNNER_TEMP/AutoHotkey_Unified"
+    [string]$CacheDir = "$env:RUNNER_TEMP/ahk-cache",
+    [string]$InstallPath = "$env:RUNNER_TEMP/AutoHotkey"
 )
 
-Write-Host "=== Setting up Unified AutoHotkey Compiler Environment ===" -ForegroundColor Magenta
+Write-Host "=== Setting up AutoHotkey Compiler Environment ===" -ForegroundColor Magenta
 
 try {
     # Step 1: Get latest release information
@@ -78,8 +78,8 @@ try {
         Write-Host "  ✓ Completed $($download.Name)" -ForegroundColor Green
     }
     
-    # Step 5: Organize files in unified structure
-    Write-Host "Organizing files in unified structure..." -ForegroundColor Cyan
+    # Step 5: Organize files for compilation
+    Write-Host "Organizing files for compilation..." -ForegroundColor Cyan
     
     # Copy Ahk2Exe.exe
     $ahk2exeExtractPath = Join-Path $TempDir "ahk2exe_extract"
@@ -283,7 +283,6 @@ try {
     # Set environment variables
     if ($env:GITHUB_ENV) {
         try {
-            Add-Content -Path $env:GITHUB_ENV -Value "AHK_UNIFIED_PATH=$InstallPath" -Encoding UTF8
             Add-Content -Path $env:GITHUB_ENV -Value "AHK_COMPILER_PATH=$compilerDir" -Encoding UTF8
             Add-Content -Path $env:GITHUB_ENV -Value "AHK_INSTALL_SUCCESS=true" -Encoding UTF8
             
@@ -298,11 +297,10 @@ try {
         if (Test-Path $env:GITHUB_ENV) {
             $envContent = Get-Content $env:GITHUB_ENV -Raw -ErrorAction SilentlyContinue
             
-            $hasUnifiedPath = $envContent -match "AHK_UNIFIED_PATH="
             $hasCompilerPath = $envContent -match "AHK_COMPILER_PATH="
             $hasInstallSuccess = $envContent -match "AHK_INSTALL_SUCCESS=true"
             
-            if ($hasUnifiedPath -and $hasCompilerPath -and $hasInstallSuccess) {
+            if ($hasCompilerPath -and $hasInstallSuccess) {
                 Write-Host "  ✓ Environment variables set successfully" -ForegroundColor Green
             } else {
                 Write-Warning "Some environment variables are missing from GITHUB_ENV file"
@@ -316,7 +314,7 @@ try {
     
     # Step 8: Summary
     Write-Host ""
-    Write-Host "=== Unified AutoHotkey Environment Setup Complete ===" -ForegroundColor Magenta
+    Write-Host "=== AutoHotkey Environment Setup Complete ===" -ForegroundColor Magenta
     Write-Host "Installation Path: $InstallPath" -ForegroundColor Green
     Write-Host "Compiler Path: $compilerDir" -ForegroundColor Green
     Write-Host "Ahk2Exe.exe: Available" -ForegroundColor Green
