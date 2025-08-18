@@ -17,7 +17,7 @@ try {
     
     $headers = @{ "User-Agent" = "PowerShell" }
     
-    # Get AutoHotkey v1.1 latest release
+    # Get AutoHotkey latest release
     $ahkApiUrl = "https://api.github.com/repos/AutoHotkey/AutoHotkey/releases"
     $ahkReleases = Invoke-RestMethod -Uri $ahkApiUrl -Headers $headers
     $v1Release = $ahkReleases | Where-Object { $_.tag_name -match "^v1\.1\." } | Select-Object -First 1
