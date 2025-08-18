@@ -15,6 +15,20 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
     
+    - name: Get AutoHotkey version info for cache key
+      id: get-versions
+      shell: pwsh
+      run: .\.github\scripts\get-ahk-versions.ps1
+    
+    - name: Cache AutoHotkey binaries
+      uses: actions/cache@v4
+      id: cache-ahk
+      with:
+        path: ${{ runner.temp }}/AutoHotkey
+        key: ${{ steps.get-versions.outputs.cache-key }}
+        restore-keys: |
+          ahk-binaries-
+    
     - name: Setup AutoHotkey Compiler
       shell: pwsh
       run: .\.github\scripts\install-ahk.ps1

@@ -12,77 +12,129 @@ param(
 Write-Host "=== Setting up AutoHotkey Compiler Environment ===" -ForegroundColor Magenta
 
 try {
-    # Step 1: Get latest release information
-    Write-Host "Fetching release information..." -ForegroundColor Cyan
-    
-    $headers = @{ "User-Agent" = "PowerShell" }
-    
-    # Get AutoHotkey latest release
-    $ahkApiUrl = "https://api.github.com/repos/AutoHotkey/AutoHotkey/releases"
-    $ahkReleases = Invoke-RestMethod -Uri $ahkApiUrl -Headers $headers
-    $v1Release = $ahkReleases | Where-Object { $_.tag_name -match "^v1\.1\." } | Select-Object -First 1
-    $v2Release = $ahkReleases | Where-Object { $_.tag_name -match "^v2\." -and -not $_.prerelease } | Select-Object -First 1
-    
-    # Get Ahk2Exe latest release  
-    $ahk2exeApiUrl = "https://api.github.com/repos/AutoHotkey/Ahk2Exe/releases/latest"
-    $ahk2exeRelease = Invoke-RestMethod -Uri $ahk2exeApiUrl -Headers $headers
-    
-    Write-Host "AutoHotkey v1.1: $($v1Release.tag_name)" -ForegroundColor Green
-    Write-Host "AutoHotkey v2.0: $($v2Release.tag_name)" -ForegroundColor Green  
-    Write-Host "Ahk2Exe: $($ahk2exeRelease.tag_name)" -ForegroundColor Green
-    
-    # Step 2: Prepare download information
-    Write-Host "Preparing downloads..." -ForegroundColor Cyan
-    
-    # Find download assets
-    $v1ZipAsset = $v1Release.assets | Where-Object { $_.name -match ".*\.zip$" -and $_.name -notmatch "ansi|x64" } | Select-Object -First 1
-    $v2ZipAsset = $v2Release.assets | Where-Object { $_.name -match ".*\.zip$" } | Select-Object -First 1  
-    $ahk2exeZipAsset = $ahk2exeRelease.assets | Where-Object { $_.name -match ".*\.zip$" } | Select-Object -First 1
-    
-    if (-not $v1ZipAsset) { throw "Could not find AutoHotkey v1.1 ZIP asset" }
-    if (-not $v2ZipAsset) { throw "Could not find AutoHotkey v2.0 ZIP asset" }
-    if (-not $ahk2exeZipAsset) { throw "Could not find Ahk2Exe ZIP asset" }
-    
-    $downloads = @(
-        @{ Name = "AutoHotkey v1.1"; Url = $v1ZipAsset.browser_download_url; File = "ahk-v1.zip"; ExtractDir = "v1_extract" }
-        @{ Name = "AutoHotkey v2.0"; Url = $v2ZipAsset.browser_download_url; File = "ahk-v2.zip"; ExtractDir = "v2_extract" }
-        @{ Name = "Ahk2Exe"; Url = $ahk2exeZipAsset.browser_download_url; File = "ahk2exe.zip"; ExtractDir = "ahk2exe_extract" }
-    )
-    
-    # Step 3: Create directories
-    Write-Host "Creating directory structure..." -ForegroundColor Cyan
+    # Step 1: Check if running in cached environment
+    $versionInfoFile = Join-Path $InstallPath "version-info.json"
     $compilerDir = Join-Path $InstallPath "Compiler"
-    New-Item -ItemType Directory -Force -Path $compilerDir | Out-Null
-    New-Item -ItemType Directory -Force -Path $CacheDir | Out-Null
+    $ahk2exePath = Join-Path $compilerDir "Ahk2Exe.exe"
+    $skipDownload = $false
     
-    foreach ($download in $downloads) {
-        New-Item -ItemType Directory -Force -Path (Join-Path $TempDir $download.ExtractDir) | Out-Null
+    # If we have environment variables from the workflow, use them for cache check
+    if ($env:AHK_V1_VERSION -and $env:AHK_V2_VERSION -and $env:AHK2EXE_VERSION) {
+        Write-Host "Using version info from environment variables..." -ForegroundColor Cyan
+        $v1Tag = $env:AHK_V1_VERSION
+        $v2Tag = $env:AHK_V2_VERSION  
+        $ahk2exeTag = $env:AHK2EXE_VERSION
+        
+        # Check if we have cached version info and it matches
+        if ((Test-Path $versionInfoFile) -and (Test-Path $ahk2exePath)) {
+            try {
+                $cachedVersions = Get-Content $versionInfoFile | ConvertFrom-Json
+                if ($cachedVersions.v1_version -eq $v1Tag -and 
+                    $cachedVersions.v2_version -eq $v2Tag -and 
+                    $cachedVersions.ahk2exe_version -eq $ahk2exeTag) {
+                    
+                    Write-Host "✓ Cache hit: Found matching versions in cache" -ForegroundColor Green
+                    Write-Host "  v1: $v1Tag" -ForegroundColor Gray
+                    Write-Host "  v2: $v2Tag" -ForegroundColor Gray  
+                    Write-Host "  Ahk2Exe: $ahk2exeTag" -ForegroundColor Gray
+                    $skipDownload = $true
+                }
+            }
+            catch {
+                Write-Host "⚠ Cache version file corrupted, will re-download" -ForegroundColor Yellow
+            }
+        }
     }
     
-    # Step 4: Download and extract files
-    Write-Host "Downloading and extracting files..." -ForegroundColor Cyan
-    
-    foreach ($download in $downloads) {
-        $zipPath = Join-Path $TempDir $download.File
-        $extractPath = Join-Path $TempDir $download.ExtractDir
+    if (-not $skipDownload) {
+        # Step 2: Get latest release information (only if not cached)
+        Write-Host "Fetching release information..." -ForegroundColor Cyan
         
-        Write-Host "  Downloading $($download.Name)..." -ForegroundColor White
-        Write-Host "    From: $($download.Url)" -ForegroundColor Gray
-        Write-Host "    To: $zipPath" -ForegroundColor Gray
+        $headers = @{ "User-Agent" = "PowerShell" }
         
-        Invoke-WebRequest -Uri $download.Url -OutFile $zipPath -ErrorAction Stop
+        # Get AutoHotkey latest release
+        $ahkApiUrl = "https://api.github.com/repos/AutoHotkey/AutoHotkey/releases"
+        $ahkReleases = Invoke-RestMethod -Uri $ahkApiUrl -Headers $headers
+        $v1Release = $ahkReleases | Where-Object { $_.tag_name -match "^v1\.1\." } | Select-Object -First 1
+        $v2Release = $ahkReleases | Where-Object { $_.tag_name -match "^v2\." -and -not $_.prerelease } | Select-Object -First 1
         
-        Write-Host "  Extracting $($download.Name)..." -ForegroundColor White
-        Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+        # Get Ahk2Exe latest release  
+        $ahk2exeApiUrl = "https://api.github.com/repos/AutoHotkey/Ahk2Exe/releases/latest"
+        $ahk2exeRelease = Invoke-RestMethod -Uri $ahk2exeApiUrl -Headers $headers
         
-        Write-Host "  ✓ Completed $($download.Name)" -ForegroundColor Green
+        $v1Tag = $v1Release.tag_name
+        $v2Tag = $v2Release.tag_name
+        $ahk2exeTag = $ahk2exeRelease.tag_name
+        
+        Write-Host "AutoHotkey v1.1: $v1Tag" -ForegroundColor Green
+        Write-Host "AutoHotkey v2.0: $v2Tag" -ForegroundColor Green  
+        Write-Host "Ahk2Exe: $ahk2exeTag" -ForegroundColor Green
+    } else {
+        # Use cached versions
+        $v1Release = @{ tag_name = $v1Tag }
+        $v2Release = @{ tag_name = $v2Tag }
+        $ahk2exeRelease = @{ tag_name = $ahk2exeTag }
     }
     
-    # Step 5: Organize files for compilation
-    Write-Host "Organizing files for compilation..." -ForegroundColor Cyan
+    if (-not $skipDownload) {
+        # Step 3: Prepare download information
+        Write-Host "Preparing downloads..." -ForegroundColor Cyan
+        
+        # Find download assets  
+        $v1ZipAsset = $v1Release.assets | Where-Object { $_.name -match ".*\.zip$" -and $_.name -notmatch "ansi|x64" } | Select-Object -First 1
+        $v2ZipAsset = $v2Release.assets | Where-Object { $_.name -match ".*\.zip$" } | Select-Object -First 1  
+        $ahk2exeZipAsset = $ahk2exeRelease.assets | Where-Object { $_.name -match ".*\.zip$" } | Select-Object -First 1
+        
+        if (-not $v1ZipAsset) { throw "Could not find AutoHotkey v1.1 ZIP asset" }
+        if (-not $v2ZipAsset) { throw "Could not find AutoHotkey v2.0 ZIP asset" }
+        if (-not $ahk2exeZipAsset) { throw "Could not find Ahk2Exe ZIP asset" }
+        
+        $downloads = @(
+            @{ Name = "AutoHotkey v1.1"; Url = $v1ZipAsset.browser_download_url; File = "ahk-v1.zip"; ExtractDir = "v1_extract" }
+            @{ Name = "AutoHotkey v2.0"; Url = $v2ZipAsset.browser_download_url; File = "ahk-v2.zip"; ExtractDir = "v2_extract" }
+            @{ Name = "Ahk2Exe"; Url = $ahk2exeZipAsset.browser_download_url; File = "ahk2exe.zip"; ExtractDir = "ahk2exe_extract" }
+        )
+        
+        # Step 4: Create directories
+        Write-Host "Creating directory structure..." -ForegroundColor Cyan
+        New-Item -ItemType Directory -Force -Path $compilerDir | Out-Null
+        New-Item -ItemType Directory -Force -Path $CacheDir | Out-Null
+        
+        foreach ($download in $downloads) {
+            New-Item -ItemType Directory -Force -Path (Join-Path $TempDir $download.ExtractDir) | Out-Null
+        }
+        
+        # Step 5: Download and extract files
+        Write-Host "Downloading and extracting files..." -ForegroundColor Cyan
+        
+        foreach ($download in $downloads) {
+            $zipPath = Join-Path $TempDir $download.File
+            $extractPath = Join-Path $TempDir $download.ExtractDir
+            
+            Write-Host "  Downloading $($download.Name)..." -ForegroundColor White
+            Write-Host "    From: $($download.Url)" -ForegroundColor Gray
+            Write-Host "    To: $zipPath" -ForegroundColor Gray
+            
+            Invoke-WebRequest -Uri $download.Url -OutFile $zipPath -ErrorAction Stop
+            
+            Write-Host "  Extracting $($download.Name)..." -ForegroundColor White
+            Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+            
+            Write-Host "  ✓ Completed $($download.Name)" -ForegroundColor Green
+        }
+    } else {
+        Write-Host "Skipping download - using cached binaries" -ForegroundColor Green
+        # Ensure directories exist
+        New-Item -ItemType Directory -Force -Path $compilerDir | Out-Null
+        New-Item -ItemType Directory -Force -Path $CacheDir | Out-Null
+    }
     
-    # Copy Ahk2Exe.exe
-    $ahk2exeExtractPath = Join-Path $TempDir "ahk2exe_extract"
+    # Step 6: Organize files for compilation (only if not cached)
+    if (-not $skipDownload) {
+        Write-Host "Organizing files for compilation..." -ForegroundColor Cyan
+        
+        # Copy Ahk2Exe.exe
+        $ahk2exeExtractPath = Join-Path $TempDir "ahk2exe_extract"
     $ahk2exeFile = Get-ChildItem $ahk2exeExtractPath -Recurse -Name "Ahk2Exe.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
     
     if (-not $ahk2exeFile) { throw "Could not find Ahk2Exe.exe in extracted files" }
@@ -216,7 +268,9 @@ try {
         Write-Host "  ✗ v2 extract directory not found: $v2ExtractPath" -ForegroundColor Red
     }
     
-    # Step 6: Verify installation
+    }  # End of file organization section (only when not cached)
+    
+    # Step 7: Verify installation
     Write-Host "Verifying installation..." -ForegroundColor Cyan
     
     $ahk2exePath = Join-Path $compilerDir "Ahk2Exe.exe"
@@ -402,6 +456,25 @@ try {
         Write-Host "=== SETUP SUCCESSFUL ===" -ForegroundColor Green
         Write-Host "AutoHotkey compiler environment is ready." -ForegroundColor Green
     }
+    
+    # Save version information for future cache checks
+    try {
+        $versionInfo = @{
+            v1_version = $v1Tag
+            v2_version = $v2Tag
+            ahk2exe_version = $ahk2exeTag
+            cached_at = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+        }
+        
+        $versionInfoJson = $versionInfo | ConvertTo-Json -Depth 2
+        Set-Content -Path $versionInfoFile -Value $versionInfoJson -Encoding UTF8
+        Write-Host "✓ Version information saved for future cache checks" -ForegroundColor Green
+    }
+    catch {
+        Write-Warning "Failed to save version information: $($_.Exception.Message)"
+        # Don't fail the entire setup for this
+    }
+    
     exit 0
 }
 catch {
