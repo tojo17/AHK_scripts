@@ -82,17 +82,50 @@ try {
     $yamlContent = Get-Content $ConfigFile -Raw
     $config = ConvertFrom-Yaml $yamlContent
     
-    # Extract script arrays
+    # Extract and parse script arrays (supporting mixed string/object format)
     $v1Scripts = @()
     $v2Scripts = @()
     
+    # Function to parse script configuration (string or object format)
+    function Parse-ScriptConfig {
+        param($scriptConfig)
+        
+        if ($scriptConfig -is [string]) {
+            # Simple string format - no dependencies
+            return @{
+                Script = $scriptConfig
+                Dependencies = @()
+            }
+        } elseif ($scriptConfig -is [hashtable] -and $scriptConfig.ContainsKey("path")) {
+            # Object format with path and optional deps
+            $deps = @()
+            if ($scriptConfig.ContainsKey("deps")) {
+                if ($scriptConfig.deps -is [array]) {
+                    $deps = $scriptConfig.deps
+                } elseif ($scriptConfig.deps -is [string]) {
+                    $deps = @($scriptConfig.deps)
+                }
+            }
+            return @{
+                Script = $scriptConfig.path
+                Dependencies = $deps
+            }
+        } else {
+            throw "Invalid script configuration format. Expected string or object with 'path' field."
+        }
+    }
+    
     if ($config.ContainsKey("ahk_v1") -and $config.ahk_v1) {
-        $v1Scripts = $config.ahk_v1
+        foreach ($scriptConfig in $config.ahk_v1) {
+            $v1Scripts += Parse-ScriptConfig -scriptConfig $scriptConfig
+        }
         Write-Host "Found $($v1Scripts.Count) v1 scripts" -ForegroundColor Green
     }
     
     if ($config.ContainsKey("ahk_v2") -and $config.ahk_v2) {
-        $v2Scripts = $config.ahk_v2
+        foreach ($scriptConfig in $config.ahk_v2) {
+            $v2Scripts += Parse-ScriptConfig -scriptConfig $scriptConfig
+        }
         Write-Host "Found $($v2Scripts.Count) v2 scripts" -ForegroundColor Green
     }
     
@@ -130,9 +163,29 @@ try {
         return $baseFilePath
     }
     
+    # Function to copy dependency files
+    function Copy-Dependencies {
+        param($dependencies, $outputDir)
+        
+        foreach ($depPath in $dependencies) {
+            if (Test-Path $depPath) {
+                $depFileName = Split-Path $depPath -Leaf
+                $destPath = Join-Path $outputDir $depFileName
+                try {
+                    Copy-Item -Path $depPath -Destination $destPath -Force
+                    Write-Host "  ✓ Copied dependency: $depFileName" -ForegroundColor Green
+                } catch {
+                    Write-Host "  ✗ Failed to copy dependency: $depPath - $($_.Exception.Message)" -ForegroundColor Red
+                }
+            } else {
+                Write-Host "  ✗ Dependency not found: $depPath" -ForegroundColor Red
+            }
+        }
+    }
+    
     # Function to compile script  
     function Compile-Script {
-        param($scriptPath, $version, $arch)
+        param($scriptPath, $version, $arch, $dependencies = @())
         
         if (-not (Test-Path $scriptPath)) {
             Write-Host "ERROR: Script not found: $scriptPath" -ForegroundColor Red
@@ -172,6 +225,13 @@ try {
             
             if ($process.ExitCode -eq 0 -and (Test-Path $outputPath)) {
                 Write-Host "✓ SUCCESS: Compiled $scriptPath [$version-$arch]" -ForegroundColor Green
+                
+                # Copy dependencies if any
+                if ($dependencies.Count -gt 0) {
+                    Write-Host "  Copying dependencies..." -ForegroundColor Cyan
+                    Copy-Dependencies -dependencies $dependencies -outputDir $outputDir
+                }
+                
                 return $true
             } else {
                 Write-Host "✗ ERROR: Failed to compile $scriptPath [$version-$arch] (Exit code: $($process.ExitCode))" -ForegroundColor Red
@@ -210,13 +270,21 @@ try {
     $allScripts = @()
     
     # Add v1 scripts
-    foreach ($script in $v1Scripts) {
-        $allScripts += @{ Script = $script; Version = "v1" }
+    foreach ($scriptInfo in $v1Scripts) {
+        $allScripts += @{ 
+            Script = $scriptInfo.Script
+            Version = "v1"
+            Dependencies = $scriptInfo.Dependencies
+        }
     }
     
     # Add v2 scripts
-    foreach ($script in $v2Scripts) {
-        $allScripts += @{ Script = $script; Version = "v2" }
+    foreach ($scriptInfo in $v2Scripts) {
+        $allScripts += @{ 
+            Script = $scriptInfo.Script
+            Version = "v2" 
+            Dependencies = $scriptInfo.Dependencies
+        }
     }
     
     if ($allScripts.Count -eq 0) {
@@ -235,18 +303,20 @@ try {
     foreach ($scriptInfo in $allScripts) {
         $script = $scriptInfo.Script
         $version = $scriptInfo.Version
+        $depCount = $scriptInfo.Dependencies.Count
         
-        Write-Host "Processing: $script ($version)" -ForegroundColor White
+        $depText = if ($depCount -gt 0) { " with $depCount dependencies" } else { "" }
+        Write-Host "Processing: $script ($version)$depText" -ForegroundColor White
         
         # Compile for x86
-        if (Compile-Script -scriptPath $script -version $version -arch "x86") {
+        if (Compile-Script -scriptPath $script -version $version -arch "x86" -dependencies $scriptInfo.Dependencies) {
             $totalSuccess++
         } else {
             $totalFail++
         }
         
         # Compile for x64
-        if (Compile-Script -scriptPath $script -version $version -arch "x64") {
+        if (Compile-Script -scriptPath $script -version $version -arch "x64" -dependencies $scriptInfo.Dependencies) {
             $totalSuccess++
         } else {
             $totalFail++

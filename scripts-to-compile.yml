@@ -1,6 +1,18 @@
 # AutoHotkey scripts compilation configuration
 # This file defines which scripts to compile for each AutoHotkey version
 # Each script will be compiled for both x86 (32-bit) and x64 (64-bit) architectures
+#
+# Configuration formats supported:
+# 1. Simple string format (no dependencies):
+#    - "path/to/script.ahk"
+# 2. Object format with single dependency:
+#    - path: "path/to/script.ahk"
+#      deps: "path/to/dependency.dll"
+# 3. Object format with multiple dependencies:
+#    - path: "path/to/script.ahk"
+#      deps:
+#        - "path/to/dependency1.dll"
+#        - "path/to/dependency2.dll"
 
 ahk_v1:
   # AutoHotkey v1.1 scripts - compiled for both x86 and x64
@@ -13,5 +25,5 @@ ahk_v1:
 
 ahk_v2:
   # AutoHotkey v2.0 scripts - compiled for both x86 and x64
-  # - "VirtualDesktopAccessor/example.ah2"
-  - "VirtualDesktopAccessor/exe/virtual_desktop.ah2"
+  - path: "VirtualDesktopAccessor/exe/virtual_desktop.ah2"
+    deps: "VirtualDesktopAccessor/exe/VirtualDesktopAccessor.dll"
