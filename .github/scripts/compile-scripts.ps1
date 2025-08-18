@@ -7,23 +7,60 @@ param(
     [string]$OutputBaseDir = "compiled"
 )
 
-# Import required modules
-try {
-    Import-Module powershell-yaml -ErrorAction Stop
-}
-catch {
-    Write-Error "PowerShell-Yaml module is required. Please run: Install-Module -Name powershell-yaml -Force"
-    exit 1
+Write-Host "=== AutoHotkey Script Compilation Setup ===" -ForegroundColor Magenta
+
+# Step 1: Create output directory structure
+Write-Host "Creating output directory structure..." -ForegroundColor Cyan
+$outputDirs = @("$OutputBaseDir/x86", "$OutputBaseDir/x64")
+foreach ($dir in $outputDirs) {
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    Write-Host "  ✓ Created directory: $dir" -ForegroundColor Green
 }
 
-# Verify configuration file exists
+# Step 2: Generate build timestamp
+Write-Host "Generating build timestamp..." -ForegroundColor Cyan
+$timestamp = Get-Date -Format "yyyyMMddHHmmss"
+Write-Host "  ✓ Generated timestamp: $timestamp" -ForegroundColor Green
+
+# Set environment variable for GitHub Actions
+if ($env:GITHUB_ENV) {
+    Add-Content -Path $env:GITHUB_ENV -Value "BUILD_TIMESTAMP=$timestamp" -Encoding UTF8
+    Write-Host "  ✓ BUILD_TIMESTAMP environment variable set" -ForegroundColor Green
+} else {
+    Write-Host "  ⚠ Not in GitHub Actions context - BUILD_TIMESTAMP not set in environment" -ForegroundColor Yellow
+}
+
+# Step 3: Install and import required modules
+Write-Host "Setting up PowerShell modules..." -ForegroundColor Cyan
+try {
+    # Try to import the module first
+    Import-Module powershell-yaml -ErrorAction Stop
+    Write-Host "  ✓ PowerShell-Yaml module already available" -ForegroundColor Green
+}
+catch {
+    Write-Host "  Installing PowerShell-Yaml module..." -ForegroundColor White
+    try {
+        Install-Module -Name powershell-yaml -Force -Scope CurrentUser -ErrorAction Stop
+        Import-Module powershell-yaml -ErrorAction Stop
+        Write-Host "  ✓ PowerShell-Yaml module installed and imported successfully" -ForegroundColor Green
+    }
+    catch {
+        Write-Error "Failed to install or import PowerShell-Yaml module: $($_.Exception.Message)"
+        Write-Host "Please manually install the module with: Install-Module -Name powershell-yaml -Force" -ForegroundColor Yellow
+        exit 1
+    }
+}
+
+# Step 4: Verify configuration file exists
+Write-Host "Verifying configuration..." -ForegroundColor Cyan
 if (-not (Test-Path $ConfigFile)) {
     Write-Error "Configuration file not found: $ConfigFile"
     exit 1
 }
+Write-Host "  ✓ Configuration file found: $ConfigFile" -ForegroundColor Green
 
-Write-Host "=== AutoHotkey Script Compilation ===" -ForegroundColor Magenta
-Write-Host "Reading YAML configuration from: $ConfigFile"
+Write-Host ""
+Write-Host "=== AutoHotkey Script Compilation Process ===" -ForegroundColor Magenta
 
 try {
     # Verify compiler environment

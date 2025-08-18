@@ -33,27 +33,7 @@ jobs:
       shell: pwsh
       run: .\.github\scripts\install-ahk.ps1
     
-    - name: Create output directories
-      shell: pwsh
-      run: |
-        # Create base output directory structure
-        $dirs = @("compiled/x86", "compiled/x64")
-        foreach ($dir in $dirs) { New-Item -ItemType Directory -Force -Path $dir | Out-Null; echo "Created directory: $dir" }
-    
-    - name: Generate build timestamp
-      shell: pwsh
-      run: |
-        $timestamp = Get-Date -Format "yyyyMMddHHmmss"
-        echo "BUILD_TIMESTAMP=$timestamp" >> $env:GITHUB_ENV
-        echo "Generated timestamp: $timestamp"
-    
-    - name: Install PowerShell-Yaml module
-      shell: pwsh
-      run: |
-        echo "Installing PowerShell-Yaml module..."
-        Install-Module -Name powershell-yaml -Force -Scope CurrentUser
-    
-    - name: Parse YAML configuration and compile
+    - name: Compile AutoHotkey scripts
       shell: pwsh
       continue-on-error: true
       run: .\.github\scripts\compile-scripts.ps1
