@@ -13,36 +13,33 @@ if (-not (Test-Path $CompiledDir)) {
 }
 
 try {
-    $versions = @("v1", "v2")
     $archs = @("x86", "x64")
     $totalFileCount = 0
     $totalSizeKB = 0
     
-    foreach ($version in $versions) {
-        foreach ($arch in $archs) {
-            $versionArchPath = Join-Path $CompiledDir "$version/$arch"
+    foreach ($arch in $archs) {
+        $archPath = Join-Path $CompiledDir $arch
+        
+        if (Test-Path $archPath) {
+            $files = Get-ChildItem -Recurse $archPath -Include "*.exe"
             
-            if (Test-Path $versionArchPath) {
-                $files = Get-ChildItem -Recurse $versionArchPath -Include "*.exe"
+            if ($files.Count -gt 0) {
+                Write-Host ""
+                Write-Host "[$arch] ($($files.Count) files):" -ForegroundColor Cyan
                 
-                if ($files.Count -gt 0) {
-                    Write-Host ""
-                    Write-Host "[$version-$arch] ($($files.Count) files):" -ForegroundColor Cyan
+                $sectionSizeKB = 0
+                $files | Sort-Object Name | ForEach-Object {
+                    $sizeKB = [math]::Round($_.Length / 1KB, 2)
+                    $sectionSizeKB += $sizeKB
                     
-                    $sectionSizeKB = 0
-                    $files | Sort-Object Name | ForEach-Object {
-                        $sizeKB = [math]::Round($_.Length / 1KB, 2)
-                        $sectionSizeKB += $sizeKB
-                        
-                        # Get relative path from current directory
-                        $relativePath = $_.FullName.Replace((Get-Location).Path + "\", "")
-                        Write-Host "  $relativePath ($sizeKB KB)" -ForegroundColor White
-                    }
-                    
-                    Write-Host "  Section total: $([math]::Round($sectionSizeKB, 2)) KB" -ForegroundColor Gray
-                    $totalSizeKB += $sectionSizeKB
-                    $totalFileCount += $files.Count
+                    # Get relative path from current directory
+                    $relativePath = $_.FullName.Replace((Get-Location).Path + "\", "")
+                    Write-Host "  $relativePath ($sizeKB KB)" -ForegroundColor White
                 }
+                
+                Write-Host "  Section total: $([math]::Round($sectionSizeKB, 2)) KB" -ForegroundColor Gray
+                $totalSizeKB += $sectionSizeKB
+                $totalFileCount += $files.Count
             }
         }
     }

@@ -106,15 +106,11 @@ try {
         $scriptName = Split-Path $scriptPath -LeafBase
         
         # Create output directory structure
-        $outputDir = Join-Path $OutputBaseDir "$version/$arch"
-        if ($scriptDir) {
-            $outputDir = Join-Path $outputDir $scriptDir
-            New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
-        }
+        $outputDir = Join-Path $OutputBaseDir $arch
+        New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
         
-        # Generate output path with arch suffix
-        $archSuffix = if ($arch -eq "x64") { "_x64" } else { "_x86" }
-        $outputPath = Join-Path $outputDir "$scriptName$archSuffix.exe"
+        # Generate output path with version and arch suffix
+        $outputPath = Join-Path $outputDir "$scriptName-$version-$arch.exe"
         
         Write-Host "Compiling [$version-$arch]: $scriptPath -> $outputPath" -ForegroundColor Cyan
         
