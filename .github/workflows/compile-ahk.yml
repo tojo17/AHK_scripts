@@ -1,0 +1,110 @@
+name: Compile AutoHotkey Scripts
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  compile:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Download and install AutoHotkey v1.1
+      shell: powershell
+      run: .\.github\scripts\install-ahk-v1.ps1
+    
+    - name: Download and install AutoHotkey v2.0
+      shell: powershell
+      run: .\.github\scripts\install-ahk-v2.ps1
+    
+    - name: Create output directories
+      shell: powershell
+      run: |
+        # Create base output directory structure
+        $dirs = @("compiled/v1/x86", "compiled/v1/x64", "compiled/v2/x86", "compiled/v2/x64")
+        foreach ($dir in $dirs) { New-Item -ItemType Directory -Force -Path $dir | Out-Null; echo "Created directory: $dir" }
+    
+    - name: Install PowerShell-Yaml module
+      shell: powershell
+      run: |
+        echo "Installing PowerShell-Yaml module..."
+        Install-Module -Name powershell-yaml -Force -Scope CurrentUser
+    
+    - name: Parse YAML configuration and compile
+      shell: powershell
+      run: .\.github\scripts\compile-scripts.ps1
+    
+    - name: List compiled files
+      shell: powershell
+      run: .\.github\scripts\list-compiled-files.ps1
+    
+    - name: Upload v1 x86 executables
+      uses: actions/upload-artifact@v4
+      if: env.SUCCESS_COUNT > 0
+      with:
+        name: ahk-v1-x86-executables
+        path: compiled/v1/x86/
+        retention-days: 30
+    
+    - name: Upload v1 x64 executables
+      uses: actions/upload-artifact@v4
+      if: env.SUCCESS_COUNT > 0
+      with:
+        name: ahk-v1-x64-executables
+        path: compiled/v1/x64/
+        retention-days: 30
+    
+    - name: Upload v2 x86 executables
+      uses: actions/upload-artifact@v4
+      if: env.SUCCESS_COUNT > 0
+      with:
+        name: ahk-v2-x86-executables
+        path: compiled/v2/x86/
+        retention-days: 30
+    
+    - name: Upload v2 x64 executables
+      uses: actions/upload-artifact@v4
+      if: env.SUCCESS_COUNT > 0
+      with:
+        name: ahk-v2-x64-executables
+        path: compiled/v2/x64/
+        retention-days: 30
+    
+    - name: Upload all executables (combined)
+      uses: actions/upload-artifact@v4
+      if: env.SUCCESS_COUNT > 0
+      with:
+        name: all-compiled-executables
+        path: compiled/
+        retention-days: 30
+    
+    - name: Create release (on tags)
+      if: startsWith(github.ref, 'refs/tags/') && env.SUCCESS_COUNT > 0
+      uses: softprops/action-gh-release@v1
+      with:
+        files: compiled/**/*.exe
+        draft: false
+        prerelease: false
+        body: |
+          ## AutoHotkey Compiled Executables
+          
+          This release contains compiled executables for AutoHotkey scripts in both v1 and v2 formats, with 32-bit and 64-bit versions.
+          
+          ### Directory Structure:
+          - `v1/x86/` - AutoHotkey v1.1 32-bit executables
+          - `v1/x64/` - AutoHotkey v1.1 64-bit executables  
+          - `v2/x86/` - AutoHotkey v2.0 32-bit executables
+          - `v2/x64/` - AutoHotkey v2.0 64-bit executables
+          
+          ### Usage:
+          - Download the appropriate version for your system
+          - Files ending with `_x86.exe` are 32-bit versions
+          - Files ending with `_x64.exe` are 64-bit versions
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

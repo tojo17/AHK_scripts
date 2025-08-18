@@ -1,0 +1,17 @@
+# AutoHotkey scripts compilation configuration
+# This file defines which scripts to compile for each AutoHotkey version
+# Each script will be compiled for both x86 (32-bit) and x64 (64-bit) architectures
+
+ahk_v1:
+  # AutoHotkey v1.1 scripts - compiled for both x86 and x64
+  - "IME Switch/ime_switch.ahk"
+  - "VirtualDesktopAccessor/example.ahk"
+  - "keyboard_redefine/hhkb.ahk"
+  - "keyboard_redefine/2.4GMouse.ahk"
+  - "left click.ahk"
+  - "man_lost_job.ahk"
+
+ahk_v2:
+  # AutoHotkey v2.0 scripts - compiled for both x86 and x64
+  - "VirtualDesktopAccessor/example.ah2"
+  - "VirtualDesktopAccessor/exe/virtual_desktop.ah2"
