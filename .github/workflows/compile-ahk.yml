@@ -56,11 +56,11 @@ jobs:
     
     - name: Download and install AutoHotkey v1.1
       shell: powershell
-      run: .\.github\scripts\install-ahk-v1.ps1
+      run: .\.github\scripts\install-ahk.ps1 -Version "v1"
     
     - name: Download and install AutoHotkey v2.0
       shell: powershell
-      run: .\.github\scripts\install-ahk-v2.ps1
+      run: .\.github\scripts\install-ahk.ps1 -Version "v2"
     
     - name: Create output directories
       shell: powershell
