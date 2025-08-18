@@ -22,12 +22,13 @@ Write-Host "Generating build timestamp..." -ForegroundColor Cyan
 $timestamp = Get-Date -Format "yyyyMMddHHmmss"
 Write-Host "  ✓ Generated timestamp: $timestamp" -ForegroundColor Green
 
-# Set environment variable for GitHub Actions
-if ($env:GITHUB_ENV) {
-    Add-Content -Path $env:GITHUB_ENV -Value "BUILD_TIMESTAMP=$timestamp" -Encoding UTF8
-    Write-Host "  ✓ BUILD_TIMESTAMP environment variable set" -ForegroundColor Green
+# Set step output for GitHub Actions
+if ($env:GITHUB_OUTPUT) {
+    # Set as step output for immediate use in workflow
+    Add-Content -Path $env:GITHUB_OUTPUT -Value "build-timestamp=$timestamp" -Encoding UTF8
+    Write-Host "  ✓ Build timestamp step output set" -ForegroundColor Green
 } else {
-    Write-Host "  ⚠ Not in GitHub Actions context - BUILD_TIMESTAMP not set in environment" -ForegroundColor Yellow
+    Write-Host "  ⚠ Not in GitHub Actions context - build timestamp: $timestamp" -ForegroundColor Yellow
 }
 
 # Step 3: Install and import required modules

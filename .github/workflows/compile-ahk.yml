@@ -34,6 +34,7 @@ jobs:
       run: .\.github\scripts\install-ahk.ps1
     
     - name: Compile AutoHotkey scripts
+      id: compile
       shell: pwsh
       continue-on-error: true
       run: .\.github\scripts\compile-scripts.ps1
@@ -47,7 +48,7 @@ jobs:
       uses: actions/upload-artifact@v4
       if: always() && hashFiles('compiled/**/*.exe') != ''
       with:
-        name: ahkexe-all-${{ github.run_number }}-${{ env.BUILD_TIMESTAMP }}
+        name: ahkexe-all-${{ github.run_number }}-${{ steps.compile.outputs.build-timestamp }}
         path: compiled/
         retention-days: 30
     
