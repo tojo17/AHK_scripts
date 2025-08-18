@@ -114,24 +114,123 @@ try {
     }
     
     # Copy v2 base files (v2 uses .exe files as base, not .bin files)
+    Write-Host "Processing AutoHotkey v2 base files..." -ForegroundColor White
     $v2ExtractPath = Join-Path $TempDir "v2_extract"
-    $v2ExeFiles = Get-ChildItem $v2ExtractPath -Recurse -Name "AutoHotkey*.exe" -ErrorAction SilentlyContinue
     
-    foreach ($exeFile in $v2ExeFiles) {
-        $sourcePath = Join-Path $v2ExtractPath $exeFile
-        $fileName = Split-Path $exeFile -Leaf
-        
-        # Rename to v2-specific naming (v2 uses .exe as base files)
-        $newName = switch ($fileName) {
-            "AutoHotkeyU32.exe" { "AutoHotkey_v2_Unicode32.exe" }
-            "AutoHotkeyU64.exe" { "AutoHotkey_v2_Unicode64.exe" }
-            "AutoHotkey.exe" { "AutoHotkey_v2_Unicode32.exe" }  # Fallback naming
-            default { "AutoHotkey_v2_$fileName" }
+    # Debug: Show v2 extract directory contents
+    Write-Host "  Examining v2 extract directory: $v2ExtractPath" -ForegroundColor Gray
+    if (Test-Path $v2ExtractPath) {
+        Write-Host "  Directory contents:" -ForegroundColor Gray
+        Get-ChildItem $v2ExtractPath -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+            $relativePath = $_.FullName.Replace($v2ExtractPath, "")
+            Write-Host "    $relativePath" -ForegroundColor DarkGray
         }
         
-        $destPath = Join-Path $compilerDir $newName
-        Copy-Item $sourcePath $destPath -Force
-        Write-Host "  ✓ Copied $fileName -> $newName" -ForegroundColor Green
+        # Search for all possible v2 executable files with multiple patterns
+        $v2ExePatterns = @("AutoHotkey*.exe", "*.exe")
+        $allV2ExeFiles = @()
+        
+        foreach ($pattern in $v2ExePatterns) {
+            $foundFiles = Get-ChildItem $v2ExtractPath -Recurse -Name $pattern -ErrorAction SilentlyContinue
+            $allV2ExeFiles += $foundFiles
+        }
+        
+        # Remove duplicates and filter for likely v2 executables
+        $v2ExeFiles = $allV2ExeFiles | Sort-Object -Unique | Where-Object {
+            $fileName = Split-Path $_ -Leaf
+            # Include AutoHotkey*.exe files and common v2 patterns
+            $fileName -match "^AutoHotkey.*\.exe$" -or
+            $fileName -match "^ahk.*\.exe$" -or  
+            $fileName -eq "AutoHotkey.exe"
+        }
+        
+        Write-Host "  Found potential v2 executable files:" -ForegroundColor Cyan
+        if ($v2ExeFiles.Count -eq 0) {
+            Write-Host "    No v2 executable files found!" -ForegroundColor Red
+            Write-Host "  Searching for ANY .exe files in v2 extract directory..." -ForegroundColor Yellow
+            $allExeFiles = Get-ChildItem $v2ExtractPath -Recurse -Name "*.exe" -ErrorAction SilentlyContinue
+            foreach ($exeFile in $allExeFiles) {
+                Write-Host "    Found .exe: $exeFile" -ForegroundColor Yellow
+            }
+        } else {
+            foreach ($exeFile in $v2ExeFiles) {
+                Write-Host "    $exeFile" -ForegroundColor Green
+            }
+        }
+        
+        # Process each found v2 executable
+        $v2FilesProcessed = 0
+        foreach ($exeFile in $v2ExeFiles) {
+            try {
+                $sourcePath = Join-Path $v2ExtractPath $exeFile
+                $fileName = Split-Path $exeFile -Leaf
+                
+                Write-Host "  Processing: $fileName" -ForegroundColor White
+                
+                # Enhanced v2-specific naming with more patterns
+                $newName = switch -Regex ($fileName) {
+                    "^AutoHotkeyU32\.exe$" { "AutoHotkey_v2_Unicode32.exe" }
+                    "^AutoHotkeyU64\.exe$" { "AutoHotkey_v2_Unicode64.exe" }
+                    "^AutoHotkey32\.exe$" { "AutoHotkey_v2_Unicode32.exe" }
+                    "^AutoHotkey64\.exe$" { "AutoHotkey_v2_Unicode64.exe" }
+                    "^AutoHotkey\.exe$" { 
+                        # Try to determine architecture from file properties or default to 32-bit
+                        Write-Host "    Detected generic AutoHotkey.exe, defaulting to 32-bit" -ForegroundColor Yellow
+                        "AutoHotkey_v2_Unicode32.exe" 
+                    }
+                    "^ahk.*32.*\.exe$" { "AutoHotkey_v2_Unicode32.exe" }
+                    "^ahk.*64.*\.exe$" { "AutoHotkey_v2_Unicode64.exe" }
+                    default { 
+                        # Try to infer architecture from filename or default to 32-bit
+                        if ($fileName -match "64|x64") {
+                            "AutoHotkey_v2_Unicode64.exe"
+                        } else {
+                            "AutoHotkey_v2_Unicode32.exe"
+                        }
+                    }
+                }
+                
+                $destPath = Join-Path $compilerDir $newName
+                
+                # Check if we already have this target file
+                if (Test-Path $destPath) {
+                    Write-Host "    Target file already exists, skipping: $newName" -ForegroundColor Yellow
+                } else {
+                    Copy-Item $sourcePath $destPath -Force
+                    Write-Host "    ✓ Copied $fileName -> $newName" -ForegroundColor Green
+                    $v2FilesProcessed++
+                }
+            }
+            catch {
+                Write-Host "    ✗ Error processing $fileName : $($_.Exception.Message)" -ForegroundColor Red
+            }
+        }
+        
+        Write-Host "  Processed $v2FilesProcessed v2 base files" -ForegroundColor $(if ($v2FilesProcessed -gt 0) { "Green" } else { "Red" })
+        
+        # If no files were processed, try a fallback approach
+        if ($v2FilesProcessed -eq 0) {
+            Write-Host "  Attempting fallback: copying any .exe file as v2 base..." -ForegroundColor Yellow
+            $anyExe = Get-ChildItem $v2ExtractPath -Recurse -Name "*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($anyExe) {
+                try {
+                    $fallbackSource = Join-Path $v2ExtractPath $anyExe
+                    $fallbackDest32 = Join-Path $compilerDir "AutoHotkey_v2_Unicode32.exe"
+                    $fallbackDest64 = Join-Path $compilerDir "AutoHotkey_v2_Unicode64.exe"
+                    
+                    Copy-Item $fallbackSource $fallbackDest32 -Force
+                    Copy-Item $fallbackSource $fallbackDest64 -Force
+                    
+                    Write-Host "    ✓ Fallback: copied $anyExe to both 32-bit and 64-bit v2 base files" -ForegroundColor Green
+                    $v2FilesProcessed = 2
+                }
+                catch {
+                    Write-Host "    ✗ Fallback failed: $($_.Exception.Message)" -ForegroundColor Red
+                }
+            }
+        }
+    } else {
+        Write-Host "  ✗ v2 extract directory not found: $v2ExtractPath" -ForegroundColor Red
     }
     
     # Step 6: Verify installation
@@ -147,18 +246,33 @@ try {
         "AutoHotkey_v2_Unicode64.exe"
     )
     
-    $foundBaseFiles = 0
+    Write-Host "Checking base files in: $compilerDir" -ForegroundColor Gray
+    $foundV1Files = 0
+    $foundV2Files = 0
+    $totalRequiredFiles = $requiredBaseFiles.Count
+    
     foreach ($baseFile in $requiredBaseFiles) {
         $baseFilePath = Join-Path $compilerDir $baseFile
         if (Test-Path $baseFilePath) {
-            Write-Host "  ✓ Found: $baseFile" -ForegroundColor Green
-            $foundBaseFiles++
+            $fileSize = (Get-Item $baseFilePath).Length
+            Write-Host "  ✓ Found: $baseFile ($([math]::Round($fileSize / 1KB, 2)) KB)" -ForegroundColor Green
+            
+            if ($baseFile -like "*_v1_*") {
+                $foundV1Files++
+            } elseif ($baseFile -like "*_v2_*") {
+                $foundV2Files++
+            }
         } else {
-            Write-Host "  ⚠ Missing: $baseFile" -ForegroundColor Yellow
+            Write-Host "  ✗ Missing: $baseFile" -ForegroundColor Red
         }
     }
     
-    Write-Host "Found $foundBaseFiles out of $($requiredBaseFiles.Count) expected base files" -ForegroundColor White
+    $foundBaseFiles = $foundV1Files + $foundV2Files
+    Write-Host ""
+    Write-Host "Base Files Summary:" -ForegroundColor White
+    Write-Host "  v1 files: $foundV1Files / 2" -ForegroundColor $(if ($foundV1Files -eq 2) { "Green" } else { "Yellow" })
+    Write-Host "  v2 files: $foundV2Files / 2" -ForegroundColor $(if ($foundV2Files -eq 2) { "Green" } else { "Red" })
+    Write-Host "  Total: $foundBaseFiles / $totalRequiredFiles" -ForegroundColor $(if ($foundBaseFiles -eq $totalRequiredFiles) { "Green" } elseif ($foundBaseFiles -ge 2) { "Yellow" } else { "Red" })
     
     # Step 7: Set environment variables
     Write-Host "Setting environment variables..." -ForegroundColor Cyan
@@ -278,30 +392,68 @@ try {
         $allGood = $false
     }
     
+    # Check each base file individually and determine impact
+    $criticalMissing = $false
+    $v1Available = $false
+    $v2Available = $false
+    
     foreach ($baseFile in $requiredBaseFiles) {
         $baseFilePath = Join-Path $compilerDir $baseFile
         if (Test-Path $baseFilePath) {
             Write-Host "  ✓ Base file found: $baseFile" -ForegroundColor Green
+            if ($baseFile -like "*_v1_*") {
+                $v1Available = $true
+            } elseif ($baseFile -like "*_v2_*") {
+                $v2Available = $true
+            }
         } else {
-            Write-Host "  ✗ Base file MISSING: $baseFile" -ForegroundColor Red
+            $isV2File = $baseFile -like "*_v2_*"
+            $color = if ($isV2File) { "Yellow" } else { "Red" }
+            $impact = if ($isV2File) { "v2 compilation will be unavailable" } else { "v1 compilation will be unavailable" }
+            Write-Host "  ✗ Base file MISSING: $baseFile ($impact)" -ForegroundColor $color
+            
+            if (-not $isV2File) {
+                $criticalMissing = $true
+            }
         }
     }
     
-    if ($foundBaseFiles -lt 2) {
-        Write-Warning "Some base files are missing. Compilation may fail for some script types."
+    # Determine overall status
+    Write-Host ""
+    Write-Host "=== Installation Status Assessment ===" -ForegroundColor Cyan
+    
+    if ($criticalMissing) {
+        Write-Host "✗ CRITICAL: v1 base files are missing - installation failed" -ForegroundColor Red
         $allGood = $false
+    } elseif (-not $v2Available) {
+        Write-Host "⚠ WARNING: v2 base files are missing - v2 compilation will not work" -ForegroundColor Yellow
+        Write-Host "✓ v1 compilation is available" -ForegroundColor Green
+        Write-Host "Installing anyway as v1 functionality is intact..." -ForegroundColor Yellow
+        $allGood = $true  # Allow installation to continue with v1 only
+    } else {
+        Write-Host "✓ All base files available - full functionality" -ForegroundColor Green
+        $allGood = $true
     }
     
     if (-not $allGood) {
         Write-Host ""
         Write-Host "=== SETUP FAILED ===" -ForegroundColor Red
-        Write-Host "One or more critical components are missing. Please check the installation." -ForegroundColor Red
+        Write-Host "Critical v1 components are missing. Installation cannot continue." -ForegroundColor Red
         exit 1
     }
     
     Write-Host ""
-    Write-Host "=== SETUP SUCCESSFUL ===" -ForegroundColor Green
-    Write-Host "All components are ready for AutoHotkey compilation." -ForegroundColor Green
+    if ($v1Available -and $v2Available) {
+        Write-Host "=== SETUP SUCCESSFUL ===" -ForegroundColor Green  
+        Write-Host "All components ready: v1 and v2 AutoHotkey compilation available." -ForegroundColor Green
+    } elseif ($v1Available) {
+        Write-Host "=== SETUP PARTIALLY SUCCESSFUL ===" -ForegroundColor Yellow
+        Write-Host "v1 AutoHotkey compilation is ready. v2 compilation is unavailable due to missing base files." -ForegroundColor Yellow
+        Write-Host "Note: v2 scripts in the configuration will fail to compile." -ForegroundColor Yellow
+    } else {
+        Write-Host "=== SETUP SUCCESSFUL ===" -ForegroundColor Green
+        Write-Host "AutoHotkey compiler environment is ready." -ForegroundColor Green
+    }
     exit 0
 }
 catch {

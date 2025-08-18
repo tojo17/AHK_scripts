@@ -78,7 +78,15 @@ try {
         
         $baseFilePath = Join-Path $env:AHK_COMPILER_PATH $baseFileName
         if (-not (Test-Path $baseFilePath)) {
-            throw "Base file not found: $baseFilePath"
+            $errorMsg = "Base file not found: $baseFilePath"
+            
+            # For v2 files, provide more helpful error message
+            if ($version -eq "v2") {
+                $errorMsg += "`nThis likely means AutoHotkey v2 base files were not properly downloaded during installation."
+                $errorMsg += "`nv2 script compilation is not available. Only v1 scripts can be compiled."
+            }
+            
+            throw $errorMsg
         }
         
         return $baseFilePath

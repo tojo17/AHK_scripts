@@ -72,10 +72,12 @@ jobs:
     
     - name: Parse YAML configuration and compile
       shell: pwsh
+      continue-on-error: true
       run: .\.github\scripts\compile-scripts.ps1
     
     - name: List compiled files
       shell: pwsh
+      if: always()
       run: .\.github\scripts\list-compiled-files.ps1
     
     - name: Debug information (on failure)
@@ -121,7 +123,7 @@ jobs:
     
     - name: Upload v1 x86 executables
       uses: actions/upload-artifact@v4
-      if: env.SUCCESS_COUNT && env.SUCCESS_COUNT != '0'
+      if: always() && hashFiles('compiled/v1/x86/**/*.exe') != ''
       with:
         name: ahk-v1-x86-executables
         path: compiled/v1/x86/
@@ -129,7 +131,7 @@ jobs:
     
     - name: Upload v1 x64 executables
       uses: actions/upload-artifact@v4
-      if: env.SUCCESS_COUNT && env.SUCCESS_COUNT != '0'
+      if: always() && hashFiles('compiled/v1/x64/**/*.exe') != ''
       with:
         name: ahk-v1-x64-executables
         path: compiled/v1/x64/
@@ -137,7 +139,7 @@ jobs:
     
     - name: Upload v2 x86 executables
       uses: actions/upload-artifact@v4
-      if: env.SUCCESS_COUNT && env.SUCCESS_COUNT != '0'
+      if: always() && hashFiles('compiled/v2/x86/**/*.exe') != ''
       with:
         name: ahk-v2-x86-executables
         path: compiled/v2/x86/
@@ -145,7 +147,7 @@ jobs:
     
     - name: Upload v2 x64 executables
       uses: actions/upload-artifact@v4
-      if: env.SUCCESS_COUNT && env.SUCCESS_COUNT != '0'
+      if: always() && hashFiles('compiled/v2/x64/**/*.exe') != ''
       with:
         name: ahk-v2-x64-executables
         path: compiled/v2/x64/
@@ -153,14 +155,14 @@ jobs:
     
     - name: Upload all executables (combined)
       uses: actions/upload-artifact@v4
-      if: env.SUCCESS_COUNT && env.SUCCESS_COUNT != '0'
+      if: always() && hashFiles('compiled/**/*.exe') != ''
       with:
         name: all-compiled-executables
         path: compiled/
         retention-days: 30
     
     - name: Create release (on tags)
-      if: startsWith(github.ref, 'refs/tags/') && env.SUCCESS_COUNT && env.SUCCESS_COUNT != '0'
+      if: startsWith(github.ref, 'refs/tags/') && hashFiles('compiled/**/*.exe') != ''
       uses: softprops/action-gh-release@v1
       with:
         files: compiled/**/*.exe
