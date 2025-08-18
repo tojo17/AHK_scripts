@@ -71,8 +71,8 @@ try {
         $baseFileName = switch ("$version-$arch") {
             "v1-x86" { "AutoHotkey_v1_Unicode32.bin" }
             "v1-x64" { "AutoHotkey_v1_Unicode64.bin" }
-            "v2-x86" { "AutoHotkey_v2_Unicode32.bin" }
-            "v2-x64" { "AutoHotkey_v2_Unicode64.bin" }
+            "v2-x86" { "AutoHotkey_v2_Unicode32.exe" }
+            "v2-x64" { "AutoHotkey_v2_Unicode64.exe" }
             default { throw "Unknown version-arch combination: $version-$arch" }
         }
         

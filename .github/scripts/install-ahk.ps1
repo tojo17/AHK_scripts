@@ -113,18 +113,19 @@ try {
         Write-Host "  ✓ Copied $fileName -> $newName" -ForegroundColor Green
     }
     
-    # Copy v2 base files  
+    # Copy v2 base files (v2 uses .exe files as base, not .bin files)
     $v2ExtractPath = Join-Path $TempDir "v2_extract"
-    $v2BinFiles = Get-ChildItem $v2ExtractPath -Recurse -Name "*.bin" -ErrorAction SilentlyContinue
+    $v2ExeFiles = Get-ChildItem $v2ExtractPath -Recurse -Name "AutoHotkey*.exe" -ErrorAction SilentlyContinue
     
-    foreach ($binFile in $v2BinFiles) {
-        $sourcePath = Join-Path $v2ExtractPath $binFile
-        $fileName = Split-Path $binFile -Leaf
+    foreach ($exeFile in $v2ExeFiles) {
+        $sourcePath = Join-Path $v2ExtractPath $exeFile
+        $fileName = Split-Path $exeFile -Leaf
         
-        # Rename to v2-specific naming
+        # Rename to v2-specific naming (v2 uses .exe as base files)
         $newName = switch ($fileName) {
-            "Unicode 32-bit.bin" { "AutoHotkey_v2_Unicode32.bin" }
-            "Unicode 64-bit.bin" { "AutoHotkey_v2_Unicode64.bin" }
+            "AutoHotkeyU32.exe" { "AutoHotkey_v2_Unicode32.exe" }
+            "AutoHotkeyU64.exe" { "AutoHotkey_v2_Unicode64.exe" }
+            "AutoHotkey.exe" { "AutoHotkey_v2_Unicode32.exe" }  # Fallback naming
             default { "AutoHotkey_v2_$fileName" }
         }
         
@@ -142,8 +143,8 @@ try {
     $requiredBaseFiles = @(
         "AutoHotkey_v1_Unicode32.bin",
         "AutoHotkey_v1_Unicode64.bin", 
-        "AutoHotkey_v2_Unicode32.bin",
-        "AutoHotkey_v2_Unicode64.bin"
+        "AutoHotkey_v2_Unicode32.exe",
+        "AutoHotkey_v2_Unicode64.exe"
     )
     
     $foundBaseFiles = 0
