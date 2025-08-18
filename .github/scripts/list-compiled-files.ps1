@@ -1,5 +1,5 @@
 # List Compiled Files
-# This script lists all compiled executable files and provides a summary
+# This script lists all compiled files (executables and dependencies) and provides a summary
 
 param(
     [string]$CompiledDir = "compiled"

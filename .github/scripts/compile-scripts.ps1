@@ -1,6 +1,7 @@
 # Compile AutoHotkey Scripts
 # This script uses Ahk2Exe compiler to compile both v1 and v2 scripts
 # It automatically selects the appropriate base file based on script version and architecture
+# Supports dependency files (DLLs, etc.) that are automatically copied to output directories
 
 param(
     [string]$ConfigFile = "scripts-to-compile.yml",

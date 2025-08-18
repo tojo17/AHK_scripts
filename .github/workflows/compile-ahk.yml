@@ -44,7 +44,7 @@ jobs:
       if: always()
       run: .\.github\scripts\list-compiled-files.ps1
     
-    - name: Upload compiled executables
+    - name: Upload compiled files
       uses: actions/upload-artifact@v4
       if: always() && hashFiles('compiled/**/*.exe') != ''
       with:
@@ -56,7 +56,7 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/') && hashFiles('compiled/**/*.exe') != ''
       uses: softprops/action-gh-release@v1
       with:
-        files: compiled/**/*.exe
+        files: compiled/**/*
         draft: false
         prerelease: false
         body: |
@@ -65,13 +65,16 @@ jobs:
           This release contains compiled executables for AutoHotkey scripts in both v1 and v2 formats, with 32-bit and 64-bit versions.
           
           ### Directory Structure:
-          - `x86/` - 32-bit executables (both v1 and v2)
-          - `x64/` - 64-bit executables (both v1 and v2)
+          - `x86/` - 32-bit executables (both v1 and v2) with their dependencies
+          - `x64/` - 64-bit executables (both v1 and v2) with their dependencies
           
           ### File Naming:
           - Files ending with `-v1-x86.exe` are AutoHotkey v1.1 32-bit versions
           - Files ending with `-v1-x64.exe` are AutoHotkey v1.1 64-bit versions
           - Files ending with `-v2-x86.exe` are AutoHotkey v2.0 32-bit versions
           - Files ending with `-v2-x64.exe` are AutoHotkey v2.0 64-bit versions
+          
+          ### Dependencies:
+          Scripts with external dependencies (e.g., DLL files) will have their required files automatically included in the same directory as the executable, ready to run without additional setup.
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
