@@ -19,6 +19,44 @@ jobs:
       shell: pwsh
       run: .\.github\scripts\install-ahk.ps1
     
+    - name: Verify AutoHotkey Installation
+      shell: pwsh  
+      run: |
+        Write-Host "=== Verifying AutoHotkey Installation ===" -ForegroundColor Magenta
+        
+        # Check if environment variables were set
+        Write-Host "Checking environment variables..." -ForegroundColor Cyan
+        if ($env:AHK_COMPILER_PATH) {
+          Write-Host "✓ AHK_COMPILER_PATH: $env:AHK_COMPILER_PATH" -ForegroundColor Green
+        } else {
+          Write-Host "✗ AHK_COMPILER_PATH not found" -ForegroundColor Red
+          exit 1
+        }
+        
+        if ($env:AHK_UNIFIED_PATH) {
+          Write-Host "✓ AHK_UNIFIED_PATH: $env:AHK_UNIFIED_PATH" -ForegroundColor Green
+        } else {
+          Write-Host "✗ AHK_UNIFIED_PATH not found" -ForegroundColor Red
+        }
+        
+        if ($env:AHK_INSTALL_SUCCESS -eq "true") {
+          Write-Host "✓ AHK_INSTALL_SUCCESS: $env:AHK_INSTALL_SUCCESS" -ForegroundColor Green
+        } else {
+          Write-Host "✗ AHK_INSTALL_SUCCESS not set to true" -ForegroundColor Red
+          exit 1
+        }
+        
+        # Verify compiler exists
+        $compilerPath = Join-Path $env:AHK_COMPILER_PATH "Ahk2Exe.exe"
+        if (Test-Path $compilerPath) {
+          Write-Host "✓ Ahk2Exe.exe found at: $compilerPath" -ForegroundColor Green
+        } else {
+          Write-Host "✗ Ahk2Exe.exe not found at: $compilerPath" -ForegroundColor Red
+          exit 1
+        }
+        
+        Write-Host "✓ All verification checks passed!" -ForegroundColor Green
+    
     - name: Create output directories
       shell: pwsh
       run: |
@@ -40,9 +78,50 @@ jobs:
       shell: pwsh
       run: .\.github\scripts\list-compiled-files.ps1
     
+    - name: Debug information (on failure)
+      if: failure()
+      shell: pwsh
+      run: |
+        Write-Host "=== Debug Information ===" -ForegroundColor Red
+        Write-Host "This step runs when previous steps fail" -ForegroundColor Yellow
+        
+        Write-Host "`nEnvironment Variables:" -ForegroundColor Cyan
+        Write-Host "AHK_COMPILER_PATH: $env:AHK_COMPILER_PATH"
+        Write-Host "AHK_UNIFIED_PATH: $env:AHK_UNIFIED_PATH" 
+        Write-Host "AHK_INSTALL_SUCCESS: $env:AHK_INSTALL_SUCCESS"
+        Write-Host "SUCCESS_COUNT: $env:SUCCESS_COUNT"
+        Write-Host "FAIL_COUNT: $env:FAIL_COUNT"
+        
+        Write-Host "`nChecking for compiled directory:" -ForegroundColor Cyan
+        if (Test-Path "compiled") {
+          Write-Host "Compiled directory exists" -ForegroundColor Green
+          Get-ChildItem -Recurse "compiled" -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "  $($_.FullName)"
+          }
+        } else {
+          Write-Host "Compiled directory does not exist" -ForegroundColor Red
+        }
+        
+        Write-Host "`nChecking AutoHotkey installation:" -ForegroundColor Cyan
+        if ($env:AHK_COMPILER_PATH) {
+          $compilerPath = Join-Path $env:AHK_COMPILER_PATH "Ahk2Exe.exe"
+          if (Test-Path $compilerPath) {
+            Write-Host "✓ Ahk2Exe.exe found at: $compilerPath" -ForegroundColor Green
+          } else {
+            Write-Host "✗ Ahk2Exe.exe NOT found at: $compilerPath" -ForegroundColor Red
+          }
+          
+          Write-Host "Contents of AHK_COMPILER_PATH:" -ForegroundColor Cyan
+          Get-ChildItem $env:AHK_COMPILER_PATH -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "  $($_.Name)"
+          }
+        } else {
+          Write-Host "✗ AHK_COMPILER_PATH not set" -ForegroundColor Red
+        }
+    
     - name: Upload v1 x86 executables
       uses: actions/upload-artifact@v4
-      if: env.SUCCESS_COUNT > 0
+      if: env.SUCCESS_COUNT && env.SUCCESS_COUNT != '0'
       with:
         name: ahk-v1-x86-executables
         path: compiled/v1/x86/
@@ -50,7 +129,7 @@ jobs:
     
     - name: Upload v1 x64 executables
       uses: actions/upload-artifact@v4
-      if: env.SUCCESS_COUNT > 0
+      if: env.SUCCESS_COUNT && env.SUCCESS_COUNT != '0'
       with:
         name: ahk-v1-x64-executables
         path: compiled/v1/x64/
@@ -58,7 +137,7 @@ jobs:
     
     - name: Upload v2 x86 executables
       uses: actions/upload-artifact@v4
-      if: env.SUCCESS_COUNT > 0
+      if: env.SUCCESS_COUNT && env.SUCCESS_COUNT != '0'
       with:
         name: ahk-v2-x86-executables
         path: compiled/v2/x86/
@@ -66,7 +145,7 @@ jobs:
     
     - name: Upload v2 x64 executables
       uses: actions/upload-artifact@v4
-      if: env.SUCCESS_COUNT > 0
+      if: env.SUCCESS_COUNT && env.SUCCESS_COUNT != '0'
       with:
         name: ahk-v2-x64-executables
         path: compiled/v2/x64/
@@ -74,14 +153,14 @@ jobs:
     
     - name: Upload all executables (combined)
       uses: actions/upload-artifact@v4
-      if: env.SUCCESS_COUNT > 0
+      if: env.SUCCESS_COUNT && env.SUCCESS_COUNT != '0'
       with:
         name: all-compiled-executables
         path: compiled/
         retention-days: 30
     
     - name: Create release (on tags)
-      if: startsWith(github.ref, 'refs/tags/') && env.SUCCESS_COUNT > 0
+      if: startsWith(github.ref, 'refs/tags/') && env.SUCCESS_COUNT && env.SUCCESS_COUNT != '0'
       uses: softprops/action-gh-release@v1
       with:
         files: compiled/**/*.exe

@@ -163,10 +163,44 @@ try {
     # Step 7: Set environment variables
     Write-Host "Setting environment variables..." -ForegroundColor Cyan
     
+    # Verify GITHUB_ENV and GITHUB_PATH exist before writing
+    if (-not $env:GITHUB_ENV) {
+        Write-Warning "GITHUB_ENV environment variable not found. This might not be running in GitHub Actions."
+    } else {
+        Write-Host "GITHUB_ENV path: $env:GITHUB_ENV" -ForegroundColor Gray
+    }
+    
+    if (-not $env:GITHUB_PATH) {
+        Write-Warning "GITHUB_PATH environment variable not found. This might not be running in GitHub Actions."
+    } else {
+        Write-Host "GITHUB_PATH path: $env:GITHUB_PATH" -ForegroundColor Gray
+    }
+    
     # Add compiler directory to PATH
-    Write-Host "$InstallPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-    Write-Host "AHK_UNIFIED_PATH=$InstallPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-    Write-Host "AHK_COMPILER_PATH=$compilerDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+    if ($env:GITHUB_PATH) {
+        Write-Host "$InstallPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        Write-Host "  ✓ Added to PATH: $InstallPath" -ForegroundColor Green
+    }
+    
+    # Set environment variables
+    if ($env:GITHUB_ENV) {
+        Write-Host "AHK_UNIFIED_PATH=$InstallPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        Write-Host "AHK_COMPILER_PATH=$compilerDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        Write-Host "AHK_INSTALL_SUCCESS=true" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        Write-Host "  ✓ Set AHK_UNIFIED_PATH=$InstallPath" -ForegroundColor Green
+        Write-Host "  ✓ Set AHK_COMPILER_PATH=$compilerDir" -ForegroundColor Green
+        Write-Host "  ✓ Set AHK_INSTALL_SUCCESS=true" -ForegroundColor Green
+        
+        # Verify the environment file was written correctly
+        if (Test-Path $env:GITHUB_ENV) {
+            $envContent = Get-Content $env:GITHUB_ENV -Raw -ErrorAction SilentlyContinue
+            if ($envContent -match "AHK_COMPILER_PATH=") {
+                Write-Host "  ✓ Environment variables written to GITHUB_ENV successfully" -ForegroundColor Green
+            } else {
+                Write-Warning "Failed to verify AHK_COMPILER_PATH in GITHUB_ENV file"
+            }
+        }
+    }
     
     # Step 8: Summary
     Write-Host ""
@@ -176,11 +210,50 @@ try {
     Write-Host "Ahk2Exe.exe: Available" -ForegroundColor Green
     Write-Host "Base Files: $foundBaseFiles found" -ForegroundColor Green
     
+    # Additional verification for GitHub Actions
+    if ($env:GITHUB_ENV) {
+        Write-Host "GitHub Actions Integration: ✓ Environment variables set" -ForegroundColor Green
+    } else {
+        Write-Host "GitHub Actions Integration: ⚠ Not running in GitHub Actions" -ForegroundColor Yellow
+    }
+    
+    # Final verification that all critical paths exist
+    Write-Host ""
+    Write-Host "=== Final Verification ===" -ForegroundColor Cyan
+    Write-Host "Verifying critical components..." -ForegroundColor White
+    
+    $allGood = $true
+    if (Test-Path $ahk2exePath) {
+        Write-Host "  ✓ Ahk2Exe.exe found at: $ahk2exePath" -ForegroundColor Green
+    } else {
+        Write-Host "  ✗ Ahk2Exe.exe NOT found at: $ahk2exePath" -ForegroundColor Red
+        $allGood = $false
+    }
+    
+    foreach ($baseFile in $requiredBaseFiles) {
+        $baseFilePath = Join-Path $compilerDir $baseFile
+        if (Test-Path $baseFilePath) {
+            Write-Host "  ✓ Base file found: $baseFile" -ForegroundColor Green
+        } else {
+            Write-Host "  ✗ Base file MISSING: $baseFile" -ForegroundColor Red
+        }
+    }
+    
     if ($foundBaseFiles -lt 2) {
         Write-Warning "Some base files are missing. Compilation may fail for some script types."
+        $allGood = $false
+    }
+    
+    if (-not $allGood) {
+        Write-Host ""
+        Write-Host "=== SETUP FAILED ===" -ForegroundColor Red
+        Write-Host "One or more critical components are missing. Please check the installation." -ForegroundColor Red
         exit 1
     }
     
+    Write-Host ""
+    Write-Host "=== SETUP SUCCESSFUL ===" -ForegroundColor Green
+    Write-Host "All components are ready for AutoHotkey compilation." -ForegroundColor Green
     exit 0
 }
 catch {
