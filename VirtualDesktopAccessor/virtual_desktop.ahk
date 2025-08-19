@@ -133,6 +133,6 @@ OnChangeDesktop(wParam, lParam, msg, hwnd) {
 ; F14 UP:: GoToPrevDesktop()
 ; F15 UP:: GoToNextDesktop()
 
-; Windows key + left/right arrow to move current window to next/prev desktop
-#Left::GoToPrevDesktop()
-#Right::GoToNextDesktop()
+; Win + A/S to move to desktop
+#A::GoToPrevDesktop()
+#S::GoToNextDesktop()

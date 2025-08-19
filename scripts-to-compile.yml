@@ -25,6 +25,6 @@ ahk_v1:
 
 ahk_v2:
   # AutoHotkey v2.0 scripts - compiled for both x86 and x64
-  - path: "VirtualDesktopAccessor/virtual_desktop.ah2"
+  - path: "VirtualDesktopAccessor/virtual_desktop.ahk"
     deps: "VirtualDesktopAccessor/VirtualDesktopAccessor.dll"
     # https://github.com/Ciantic/VirtualDesktopAccessor/releases/
