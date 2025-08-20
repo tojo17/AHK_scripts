@@ -4,6 +4,13 @@
 ; https://github.com/k-ayaki/IMEv2.ahk
 #Include ./IMEv2.ahk/IMEv2.ahk
 
+logging := true ; Set to true to enable logging
+flog(text) {
+    if (logging) {
+        FileAppend(A_Now text "`n", "ime_switch.log")
+    }
+}
+
 locales := {
     ja: {
         trigger: "vkFF", ; henkan
@@ -42,6 +49,7 @@ debug_status() {
     t_lang := Format("{:X}", t_lang)
     t_convmode := IME_GetConvMode()
     t_imestatus := IME_GET()
+    flog("[Debug] Current HKL: " t_lang ", ConvMode: " t_convmode ", IME Status: " t_imestatus)
     ToolTip("Current IME: " t_lang " | Conversion Mode: " t_convmode " | Status: " t_imestatus)
     SetTimer(ToolTip, -5000)  ; Hide tooltip after 2 seconds
 }
@@ -69,6 +77,7 @@ get_locale_config(){
             return data
         }
     }
+    flog("[Error] No matching locale found for current HKL: " current_hkl)
     ToolTip("No matching locale found")
     SetTimer(ToolTip, -2000) ; Hide tooltip after 2 seconds
     return
@@ -77,27 +86,38 @@ get_locale_config(){
 ; return: 0 for ALPHANUMERIC, 1 for NATIVE, none for other
 get_na() {
     l_config := get_locale_config()
-    if (!l_config)
+    if (!l_config) {
+        flog("[Error] get_na: No locale config found")
         return
+    }
+    debug_status()
     if (IME_GetConvMode() = l_config.alphanumeric.conv_mode
         && IME_GET() = l_config.alphanumeric.ime_status) {
-        ; ToolTip("get_na: ALPHANUMERIC")
+        flog("[Info] get_na: ALPHANUMERIC")
         return 0 ; ALPHANUMERIC
     } else if (IME_GetConvMode() = l_config.native.conv_mode
         && IME_GET() = l_config.native.ime_status) {
-        ; ToolTip("get_na: NATIVE")
+        flog("[Info] get_na: NATIVE")
         return 1 ; NATIVE
+    } else {
+        ; If conv_mode or ime_status do not match, return none
+        flog("[Warn] get_na: no match, conv_mode: " IME_GetConvMode() ", ime_status: " IME_GET() 
+            ", expected conv_mode: " l_config.alphanumeric.conv_mode ", " l_config.native.conv_mode
+            ", expected ime_status: " l_config.alphanumeric.ime_status ", " l_config.native.ime_status)
+        return
     }
-    ; If conv_mode or ime_status do not match, return none
-    ; ToolTip("get_na: no match, conv_mode: " IME_GetConvMode() ", ime_status: " IME_GET())
 }
 
 ; target : 0 for ALPHANUMERIC, 1 for NATIVE, if other or not provided, it will toggle
 toggle_na(target := "") {
+    flog("[Info] toggle_na: target: " target)
     l_config := get_locale_config()
-    if (!l_config)
+    if (!l_config) {
+        flog("[Error] toggle_na: No locale config found")
         return
+    }
     na_toggle_key := l_config.na_toggle_key
+    flog("[Info] toggle_na: na_toggle_key: " na_toggle_key)
     if (target = 0) {
         na_config := l_config.alphanumeric
     } else if (target = 1) {
@@ -109,57 +129,69 @@ toggle_na(target := "") {
         return
     }
     ToolTip(target = 0 ? "en" : "native")
-    ; Try 1: set conv_mode
-    IME_SetConvMode(na_config.conv_mode)
+    ; Try use na_toggle_key
+    flog("[Info] toggle_na: Trying to switch using na_toggle_key: " na_toggle_key)
+    Send(na_toggle_key)
     if get_na() = target {
-        ; ToolTip("Switched using conv_mode")
+        flog("[Info] toggle_na: Switched using na_toggle_key")
         SetTimer(ToolTip, -2000)
         return
     }
-    ; Try 2: set ime_status
-    IME_SET(na_config.ime_status)
-    if get_na() = target {
-        ; ToolTip("Switched using ime_status")
-        SetTimer(ToolTip, -2000)
-        return
-    }
-    ; Try 3: use switch hotkey
+    ; Try use switch hotkey
     if (na_config.HasOwnProp("switch_hotkey")) {
+        flog("[Info] toggle_na: Trying to switch using switch_hotkey: " na_config.switch_hotkey)
         Send(na_config.switch_hotkey)
         if get_na() = target {
-            ; ToolTip("Switched using switch_hotkey")
+            flog("[Info] toggle_na: Switched using switch_hotkey")
             SetTimer(ToolTip, -2000)
             return
         }
     }
-    ; Try 4: use na_toggle_key
-    Send(na_toggle_key)
+    ; Try set ime_status
+    flog("[Info] toggle_na: Trying to switch using ime_status: " na_config.ime_status)
+    IME_SET(na_config.ime_status)
     if get_na() = target {
-        ; ToolTip("Switched using na_toggle_key")
+        flog("[Info] toggle_na: Switched using ime_status")
         SetTimer(ToolTip, -2000)
         return
     }
-    ToolTip("Failed to toggle NATIVE/ALPHANUMERIC")
+    ; Try set conv_mode
+    flog("[Info] toggle_na: Trying to switch using conv_mode: " na_config.conv_mode)
+    IME_SetConvMode(na_config.conv_mode)
+    if get_na() = target {
+        flog("[Info] toggle_na: Switched using conv_mode")
+        SetTimer(ToolTip, -2000)
+        return
+    }
+    flog("[Error] toggle_na: Failed to switch to target: " target)
+    ; ToolTip("Failed to toggle NATIVE/ALPHANUMERIC")
     SetTimer(ToolTip, -2000) ; Hide tooltip after 2 seconds
 }
 
 
 ; locale_pressed: "zh_cn", "ja", etc.
 switch_lang(locale_pressed, *) {
+    flog("[Info] switch_lang: locale_pressed: " locale_pressed)
     current_hkl := Get_Keyboard_Layout()
+    flog("[Info] switch_lang: current_hkl: " current_hkl)
     if (current_hkl = locales.%locale_pressed%.hkl) {
         ; If pressed same locale, toggle between NATIVE and ALPHANUMERIC
+        flog("[Info] switch_lang: Same locale pressed, toggling NATIVE/ALPHANUMERIC")
         toggle_na()
     } else {
         ; If pressed different locale, switch to that locale
+        flog("[Info] switch_lang: Switching to locale: " locale_pressed)
         set_keyboard_layout(locales.%locale_pressed%.hkl)
+        ; Wait for the layout to be set
+        Sleep(100)
         ; Toggle to NATIVE
         if (get_na() != 1) {
+            flog("[Info] switch_lang: Toggling to NATIVE after switching locale")
             toggle_na(1)
         }
         ToolTip(locale_pressed)
     }
-    ; debug_status()
+    debug_status()
     SetTimer(ToolTip, -2000) ; Hide tooltip after 2 seconds
 }
 
@@ -169,3 +201,5 @@ for locale, data in locales.OwnProps() {
 }
 ; Hotkey for toggling NATIVE/ALPHANUMERIC
 Hotkey(toggle_hotkey, (*) => toggle_na())
+
+q::debug_status()
