@@ -1,103 +1,112 @@
-# IMESwitch - IME切り替えツール
+# IMESwitch
 
-AutoHotkey v2用のIME（Input Method Editor）切り替えスクリプトです。日本語IMEと中国語IME間の切り替え、および各IME内での言語モード切り替えを効率的に行えます。
+AutoHotkey v2 ベースのインテリジェントな IME 切り替えツール。中国語と日本語 IME のシームレスな切り替えをサポート。
 
-## 機能
+## 機能概要
 
-- 日本語IMEと中国語IME間の素早い切り替え
-- 各IME内での日本語/英語、中国語/英語の切り替え
-- キーボードの特定キーによる直感的な操作
-- UWPアプリケーションへの対応
-- ログ機能とデバッグ機能
-- ツールチップによる視覚的フィードバック
+物理キーによる高速な入力言語・入力モードの切り替え：
+- `変換キー` (Henkan): 日本語 IME に切り替え
+- `無変換キー` (Muhenkan): 中国語 IME に切り替え
+- `ひらがなカタカナローマ字キー` (Kana): 現在の IME 内で入力モードを切り替え
+- 同じキーの連続押下でネイティブ入力モードと英数字モードを切り替え
 
-## キーバインド
+## 設定要件
 
-| キー | 機能 |
-|------|------|
-| 変換（Henkan） | 日本語IMEへ切り替え／日本語⇔英語モード切り替え |
-| 無変換（Muhenkan） | 中国語IMEへ切り替え／中国語⇔英語モード切り替え |
-| カナ（Kana） | 現在のIMEの言語切り替え |
+### 日本語 IME 設定
 
-## 必要な設定
+**Microsoft IME の設定が必要:**
 
-### 日本語IME設定
-- **Ctrl + F12**: IME ON
-- **Ctrl + Alt + F12**: IME OFF
-- **F7**: IME ON/OFF切り替え
+1. **IME ON ホットキー**: `Ctrl + F12`
 
-### 中国語IME設定
-- **Ctrl + Space**: 中国語⇔英語切り替え
+2. **IME OFF ホットキー**: `Ctrl + Alt + F12`  
+   - このキーは既存の IME OFF キーからコピーする必要がある
+   - そうしないと全ての欄をIME-オフに設定できないみたい
 
-## 使用方法
+3. **IME ON/OFF 切り替え**: `F7`
+   - 無入力を IME-オン/オフ に設定、他は維持でOK
 
-1. 必要な設定を各IMEで行う
-2. `ime_switch.ahk`を実行する
-3. 変換キーで日本語IME、無変換キーで中国語IMEに切り替える
-4. 同じキーを再度押すと、そのIME内での言語モードが切り替わる
-5. 切り替えが成功すると、画面右下にツールチップで現在の言語が表示されます
+### 中国語 IME 設定
 
-## ファイル構成
+**Microsoft Pinyin の設定が必要:**
+
+1. **中英文切り替え**: `Ctrl + Space`
+   - 通常はデフォルト設定
+
+### Kana キーの動作
+
+- **日本語モード**: F7 キー送信（IME 切り替え or ひらがな→カタカナ変換）
+- **中国語モード**: Ctrl + Space 送信（中英文切り替え）
+
+**注意**: 入力中の文字列がある場合とない場合で動作が異なる
+
+## 技術実装
+
+### コアコンポーネント
+
+- **ime_switch.ahk**: メインスクリプト、言語切り替えロジックを含む
+- **IMEv2.ahk/**: IME 制御ライブラリ、AutoHotkey v1 から移植
+  - IMM32 API を通じて直接 IME 状態を制御
+  - GUIThreadInfo を使用して正しいウィンドウハンドルを取得
+
+### 互換性対応
+
+異なるアプリケーションタイプに対する特別な処理を含む：
+- **従来のデスクトップアプリ**: IME 状態と変換モードで直接判定
+- **UWP アプリ**: API 制限により、ホットキー送信のフォールバック方式を採用
+
+### 状態検出ロジック
 
 ```
-IMESwitch/
-├── ime_switch.ahk      # メインスクリプト
-├── ime_switch.log      # ログファイル（デバッグ時）
-├── IMEv2.ahk/          # IME制御ライブラリ（サブモジュール）
-│   ├── IMEv2.ahk       # IME制御関数
-│   ├── README.md       # ライブラリ説明
-│   └── testIMEv2.ahk   # テストコード
-└── README.md           # このファイル
+get_na() 戻り値：
+0: 英数字モード (ALPHANUMERIC)  
+1: ネイティブ入力モード (NATIVE)
+2: 不明 (通常は UWP アプリ中の日本語 IME)
 ```
 
-## 依存関係
+#### 検出フロー
 
-- [IMEv2.ahk](https://github.com/k-ayaki/IMEv2.ahk) - AutoHotkey v2用のIME制御ライブラリ
+```mermaid
+flowchart TD
+    A[開始: get_na] --> B[IME状態と変換モードを取得]
+    B --> C{IME状態 == 期待する<br/>ネイティブ状態?}
+    C -->|はい| D[戻り値: 1 NATIVE<br/>zh_CN_NATIVE/ja_NATIVE]
+    C -->|いいえ| E{現在は中国語IME?<br/>HKL=0x08040804}
+    E -->|はい| F{変換モード == 1?}
+    E -->|いいえ| G[戻り値: 2 不明<br/>ja_ALPHANUMERIC/ja_NATIVE<br/>UWP環境]
+    F -->|はい| H[戻り値: 1 NATIVE<br/>zh_CN_NATIVE UWP環境]
+    F -->|いいえ| I[戻り値: 0 ALPHANUMERIC<br/>zh_CN_ALPHANUMERIC]
+    
+    style D fill:#90EE90
+    style H fill:#90EE90
+    style I fill:#FFB6C1
+    style G fill:#FFE4B5
+```
 
-## 設定オプション
+**判定基準:**
+- **中国語 IME**: 
+  - IME状態=1 かつ 変換モード=1 → NATIVE
+  - IME状態=0 かつ 変換モード=1 → NATIVE (UWP)
+  - IME状態=0 かつ 変換モード=0 → ALPHANUMERIC
+- **日本語 IME**: 
+  - IME状態=1 かつ 変換モード=25 → NATIVE
+  - その他の状態 → 不明 (UWP環境制限)
 
-スクリプト内で以下の設定を変更できます：
+## 既知の問題
 
-- `logging`: ログ出力の有効/無効（デフォルト: false）
-- `debugging_tooltip`: デバッグ用ツールチップの有効/無効（デフォルト: false）
+**UWP アプリ互換性**: 一部の UWP アプリで IME 状態の精密な検出ができず、ホットキー切り替えに依存
 
-## ツールチップ表示
+## デバッグ機能
 
-本スクリプトでは、操作の確認や状態表示のためにツールチップが表示されます：
+- `logging := true` で詳細ログ記録を有効化
+- `debugging_tooltip := true` でリアルタイム状態表示を有効化
+- ログファイル: `ime_switch.log`
 
-### 言語切り替え時のツールチップ
-- **"ja"**: 日本語IMEに切り替わった時
-- **"zh_cn"**: 中国語IMEに切り替わった時  
-- **"en"**: 英語モードに切り替わった時
+## サポート対象 IME
 
-### デバッグ用ツールチップ
-`debugging_tooltip`を`true`に設定すると、以下の詳細情報が表示されます：
-- 現在のIME言語コード（HKL）
-- 変換モード（Conversion Mode）
-- IME状態（ON/OFF）
+- 日本語: Microsoft IME (HKL: 0x04110411)
+- 中国語: Microsoft Pinyin (HKL: 0x08040804)
 
-### エラー通知ツールチップ
-- 設定されていない言語への切り替え試行時
-- IME制御に失敗した場合
+## 参考資料
 
-**表示時間**: ツールチップは2秒後に自動的に消えます
-**UWP APP**: UWPアプリケーションではツールチップが表示されない場合があります
-
-## 対応環境
-
-- AutoHotkey v2.0以降
-- Microsoft IME（日本語、中国語）
-- UWPアプリケーション対応（API制限によって、現在のIME状態をうまく認識できない場合があります）
-
-## 注意事項
-
-- 初回使用時は各IMEで指定されたホットキーを設定する必要があります
-- UWPアプリケーションでは一部制限がある場合があります
-- ログファイルは同ディレクトリに`ime_switch.log`として出力されます
-
-## トラブルシューティング
-
-- IMEが正しく切り替わらない場合は、各IMEのホットキー設定を確認してください
-- UWPアプリで動作しない場合があります
-- デバッグが必要な場合は、`logging`と`debugging_tooltip`を`true`に設定してください
-  
+- IMEv2.ahk ライブラリは [k-ayaki/IMEv2.ahk](https://github.com/k-ayaki/IMEv2.ahk) をベース
+- 元の IME.ahk は AutoHotkey コミュニティ由来 (NYSL ライセンス)
