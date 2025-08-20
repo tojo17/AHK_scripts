@@ -70,7 +70,7 @@ debug_status() {
     flog("[Debug] Current HKL: " t_lang ", ConvMode: " t_convmode ", IME Status: " t_imestatus)
     if (debugging_tooltip) {
         ToolTip("Current IME: " t_lang " | Conversion Mode: " t_convmode " | Status: " t_imestatus)
-        SetTimer(ToolTip, -5000)  ; Hide tooltip after 2 seconds
+        SetTimer(ToolTip, -5000)  ; Hide tooltip after 5 seconds
     }
 }
 
