@@ -28,7 +28,7 @@ ahk_v2:
   - path: "VirtualDesktopAccessor/virtual_desktop.ahk"
     deps: "VirtualDesktopAccessor/VirtualDesktopAccessor.dll"
     # https://github.com/Ciantic/VirtualDesktopAccessor/releases/
-  - "IME Switch/ime_switch.ahk"
+  - "IMESwitch/ime_switch.ahk"
   - path: "all_in_one_v2.ahk"
     deps: "VirtualDesktopAccessor/VirtualDesktopAccessor.dll"
 
