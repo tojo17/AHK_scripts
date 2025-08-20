@@ -1,0 +1,3 @@
+[submodule "IMESwitch/IMEv2.ahk"]
+	path = IMESwitch/IMEv2.ahk
+	url = https://github.com/k-ayaki/IMEv2.ahk.git
