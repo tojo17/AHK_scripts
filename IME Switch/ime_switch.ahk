@@ -159,7 +159,7 @@ switch_lang(locale_pressed, *) {
         }
         ToolTip(locale_pressed)
     }
-    debug_status()
+    ; debug_status()
     SetTimer(ToolTip, -2000) ; Hide tooltip after 2 seconds
 }
 
