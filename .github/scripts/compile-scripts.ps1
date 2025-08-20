@@ -218,11 +218,31 @@ try {
                 "/base", "`"$baseFilePath`""
             )
             
-            # Execute compilation
+            # Execute compilation with timeout protection
             $tempOutput = Join-Path $env:TEMP "compile_output_$(Get-Random).txt"
             $tempError = Join-Path $env:TEMP "compile_error_$(Get-Random).txt"
             
-            $process = Start-Process -FilePath $compilerPath -ArgumentList $arguments -Wait -PassThru -NoNewWindow -RedirectStandardOutput $tempOutput -RedirectStandardError $tempError
+            # Start process without -Wait to enable timeout control
+            $process = Start-Process -FilePath $compilerPath -ArgumentList $arguments -PassThru -NoNewWindow -RedirectStandardOutput $tempOutput -RedirectStandardError $tempError
+            
+            # Wait for process with timeout (5 minutes max per compilation)
+            $timeoutSeconds = 300
+            $waitResult = $process.WaitForExit($timeoutSeconds * 1000)
+            
+            if (-not $waitResult) {
+                # Process timed out - force kill it
+                Write-Host "  ⚠ Compilation timed out after $timeoutSeconds seconds - terminating process" -ForegroundColor Yellow
+                try {
+                    $process.Kill()
+                    $process.WaitForExit(5000)  # Wait up to 5 seconds for cleanup
+                }
+                catch {
+                    Write-Host "  ⚠ Failed to terminate process cleanly: $($_.Exception.Message)" -ForegroundColor Yellow
+                }
+                
+                Write-Host "✗ ERROR: Compilation timed out for $scriptPath [$version-$arch]" -ForegroundColor Red
+                return $false
+            }
             
             if ($process.ExitCode -eq 0 -and (Test-Path $outputPath)) {
                 Write-Host "✓ SUCCESS: Compiled $scriptPath [$version-$arch]" -ForegroundColor Green
@@ -247,7 +267,7 @@ try {
                 
                 # Display standard output for additional context
                 if (Test-Path $tempOutput) {
-                    $outputContent = Get-Content $tempOutput -Raw -ErrorAction SilentlyContinuous
+                    $outputContent = Get-Content $tempOutput -Raw -ErrorAction SilentlyContinue
                     if ($outputContent -and $outputContent.Trim()) {
                         Write-Host "  Compiler output: $outputContent" -ForegroundColor Yellow
                     }
@@ -261,9 +281,26 @@ try {
             return $false
         }
         finally {
+            # Clean up temp files and ensure process is terminated
+            try {
+                if ($process -and -not $process.HasExited) {
+                    Write-Host "  ⚠ Forcefully terminating lingering process" -ForegroundColor Yellow
+                    $process.Kill()
+                    $process.WaitForExit(2000)
+                }
+            }
+            catch {
+                Write-Host "  ⚠ Error during process cleanup: $($_.Exception.Message)" -ForegroundColor Yellow
+            }
+            
             # Clean up temp files
-            Remove-Item $tempOutput -ErrorAction SilentlyContinue
-            Remove-Item $tempError -ErrorAction SilentlyContinue
+            try {
+                if (Test-Path $tempOutput) { Remove-Item $tempOutput -Force -ErrorAction SilentlyContinue }
+                if (Test-Path $tempError) { Remove-Item $tempError -Force -ErrorAction SilentlyContinue }
+            }
+            catch {
+                Write-Host "  ⚠ Failed to clean temp files: $($_.Exception.Message)" -ForegroundColor Yellow
+            }
         }
     }
     

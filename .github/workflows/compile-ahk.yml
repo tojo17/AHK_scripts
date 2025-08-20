@@ -37,6 +37,7 @@ jobs:
       id: compile
       shell: pwsh
       continue-on-error: true
+      timeout-minutes: 30
       run: .\.github\scripts\compile-scripts.ps1
     
     - name: List compiled files
