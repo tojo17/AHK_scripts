@@ -76,10 +76,10 @@ flowchart TD
     F -->|はい| H[戻り値: 1 NATIVE<br/>zh_CN_NATIVE UWP環境]
     F -->|いいえ| I[戻り値: 0 ALPHANUMERIC<br/>zh_CN_ALPHANUMERIC]
     
-    style D fill:#90EE90
-    style H fill:#90EE90
-    style I fill:#FFB6C1
-    style G fill:#FFE4B5
+    style D fill:#228B22,color:#FFFFFF
+    style H fill:#228B22,color:#FFFFFF
+    style I fill:#DC143C,color:#FFFFFF
+    style G fill:#FF8C00,color:#FFFFFF
 ```
 
 **判定基準:**
