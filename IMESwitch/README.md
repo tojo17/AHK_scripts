@@ -18,12 +18,14 @@ AutoHotkey v2 ベースのインテリジェントな IME 切り替えツール�
 
 1. **IME ON ホットキー**: `Ctrl + F12`
 
-2. **IME OFF ホットキー**: `Ctrl + Alt + F12`  
+2. **IME OFF ホットキー**: `Ctrl + Shift + F12`  
    - このキーは既存の IME OFF キーからコピーする必要がある
    - そうしないと全ての欄をIME-オフに設定できないみたい
 
 3. **IME ON/OFF 切り替え**: `F7`
    - 無入力を IME-オン/オフ に設定、他は維持でOK
+
+![alt text](image.png)
 
 ### 中国語 IME 設定
 

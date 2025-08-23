@@ -41,7 +41,7 @@ locales := {
         alphanumeric: {
             conv_mode: 25,
             ime_status: 0,
-            switch_hotkey: "^!{F12}" ; Ctrl + Alt + F12
+            switch_hotkey: "^+{F12}" ; Ctrl + Shift + F12
         }
     },
     zh_cn: {
