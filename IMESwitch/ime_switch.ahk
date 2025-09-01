@@ -13,7 +13,7 @@
 ; Required settings:
 ; - Set in Japanese IME
 ;   - Ctrl + F12 for IME ON
-;   - Ctrl + Alt + F12 for IME OFF (Should be copied from the IME OFF key, or you cannot set this function for all)
+;   - Ctrl + Shift + F12 for IME OFF (Should be copied from the IME OFF key, or you cannot set this function for all)
 ;   - F7 for toggling IME ON/OFF
 ; - Set in Chinese IME
 ;   - Ctrl + Space for toggling CN/EN
