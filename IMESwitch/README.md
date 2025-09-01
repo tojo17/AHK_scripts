@@ -14,25 +14,39 @@ AutoHotkey v2 ベースのインテリジェントな IME 切り替えツール�
 
 ### 日本語 IME 設定
 
-**Microsoft IME の設定が必要:**
+#### Microsoft IME の設定：
 
 1. **IME ON ホットキー**: `Ctrl + F12`
 
 2. **IME OFF ホットキー**: `Ctrl + Shift + F12`  
-   - このキーは既存の IME OFF キーからコピーする必要がある
-   - そうしないと全ての欄をIME-オフに設定できないみたい
+    - このキーは既存の IME OFF キーからコピーする必要がある
+    - そうしないと全ての欄をIME-オフに設定できないみたい
 
 3. **IME ON/OFF 切り替え**: `F7`
-   - 無入力を IME-オン/オフ に設定、他は維持でOK
+    - 無入力を IME-オン/オフ に設定、他は維持でOK
 
-![alt text](image.png)
+![alt text](img/image-1.png)
+
+#### Google 日本語入力の設定：
+
+1. **IME ON ホットキー**: 
+    - 直接入力モードを `Ctrl + F12` と `F7` に設定
+
+2. **IME OFF ホットキー**:
+    - 入力文字なしモードを `Ctrl + Shift + F12`  と `F7` に設定
+
+3. **キャンセル後IMEを無効化ホットキー**: 
+    - サジェスト選択中、サジェスト表示中、変換前入力中、変換中モードで `Ctrl + Shift + F12`  に設定
+  
+![alt text](img/image-2.png)
+
 
 ### 中国語 IME 設定
 
-**Microsoft Pinyin の設定が必要:**
+#### Microsoft Pinyin の設定：
 
 1. **中英文切り替え**: `Ctrl + Space`
-   - 通常はデフォルト設定
+    - 通常はデフォルト設定
 
 ### Kana キーの動作
 
