@@ -5,14 +5,14 @@
 #Include ./IMEv2.ahk/IMEv2.ahk
 
 ; IME Switcher for AutoHotkey v2
-; Press Muhenkan for zh_CN, Henkan for ja_JP
+; Press Kana for zh_CN, Henkan for ja_JP
 ; Press same key again to toggle between NATIVE and ALPHANUMERIC modes
-; In ja_JP, press Kana for F7, toggle JP/EN if no input, or convert to Katakana if input exists
-; In zh_CN, press Kana to toggle CN/EN
+; In ja_JP, press Muhenkan for F7, toggle JP/EN if no input, or convert to Katakana if input exists
+; In zh_CN, press Muhenkan to toggle CN/EN
 
 ; Required settings:
 ; - Set in Japanese IME
-;   - Ctrl + F12 for IME ON
+;   - Ctrl + Shift + F11 for IME ON
 ;   - Ctrl + Shift + F12 for IME OFF (Should be copied from the IME OFF key, or you cannot set this function for all)
 ;   - F7 for toggling IME ON/OFF
 ; - Set in Chinese IME
@@ -28,6 +28,10 @@ flog(text) {
     }
 }
 
+; SC079 = Henkan
+; SC07B = Muhenkan
+; SC070 = Kana
+
 locales := {
     ja: {
         trigger: "SC079", ; henkan
@@ -36,7 +40,7 @@ locales := {
         native: {
             conv_mode: 25,
             ime_status: 1,
-            switch_hotkey: "^{F12}" ; Ctrl + F12
+            switch_hotkey: "^+{F11}" ; Ctrl + Shift + F11
         },
         alphanumeric: {
             conv_mode: 25,
@@ -45,7 +49,7 @@ locales := {
         }
     },
     zh_cn: {
-        trigger: "SC07B", ; muhenkan
+        trigger: "SC070", ; Kana key
         hkl: Number("0x08040804"),
         na_toggle_key: "^ ", ; Ctrl + Space
         native: {
@@ -58,7 +62,7 @@ locales := {
         }
     }
 }
-kana_hotkey := "SC070" ; Kana key
+kana_hotkey := "SC07B" ; muhenkan
 
 debugging_tooltip := false ; Set to true to enable debugging tooltip
 ; Show the current HKL in a tooltip
